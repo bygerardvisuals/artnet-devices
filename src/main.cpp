@@ -394,8 +394,11 @@ void processSerialCommand(const String& command) {
   if (command.startsWith("ARCFG SET ")) {
     bool ok = applyConfigJson(command.substring(10));
     Serial.println(ok ? "ARCFG OK" : "ARCFG ERROR IP inválida");
+    // Native USB CDC can disappear as soon as ESP.restart() is called. Flush
+    // the acknowledgement first so Chrome has a deterministic completion.
+    Serial.flush();
     if (ok) {
-      delay(500);
+      delay(1000);
       ESP.restart();
     }
     return;

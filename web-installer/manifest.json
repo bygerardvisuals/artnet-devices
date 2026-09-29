@@ -1,12 +1,12 @@
 {
   "name": "Art-Net Relay",
-  "version": "1.0.7-usb-config",
+  "version": "1.0.8-usb-config",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-C6",
       "parts": [
-        { "path": "firmware/artnet-relay-esp32c6-supermini-usb-config-v7.bin", "offset": 0 }
+        { "path": "firmware/artnet-relay-esp32c6-supermini-usb-config-v8.bin", "offset": 0 }
       ]
     },
     {
