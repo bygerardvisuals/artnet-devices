@@ -1,7 +1,4 @@
 #include <Arduino.h>
-#if defined(CONFIG_IDF_TARGET_ESP32C6)
-#include <Adafruit_NeoPixel.h>
-#endif
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -31,8 +28,6 @@ constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
 // by their PlatformIO environment when necessary.
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
 constexpr uint8_t STATUS_RGB_PIN = 8;
-Adafruit_NeoPixel statusPixel(1, STATUS_RGB_PIN, NEO_GRB + NEO_KHZ800);
-bool statusPixelReady = false;
 #else
   #ifndef STATUS_LED_PIN
     #ifdef LED_BUILTIN
@@ -169,9 +164,9 @@ void saveConfig() {
 
 void setStatusLed(bool on) {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
-  if (!statusPixelReady) return;
-  statusPixel.setPixelColor(0, on ? statusPixel.Color(255, 255, 255) : 0);
-  statusPixel.show();
+  // Arduino's C6 RGB driver owns the RMT peripheral safely.  The SuperMini
+  // LED is a single GRB WS2812 wired to GPIO 8.
+  rgbLedWrite(STATUS_RGB_PIN, on ? 255 : 0, on ? 255 : 0, on ? 255 : 0);
 #else
   digitalWrite(STATUS_LED_PIN, (on ^ STATUS_LED_INVERTED) ? HIGH : LOW);
 #endif
@@ -179,8 +174,6 @@ void setStatusLed(bool on) {
 
 void setupStatusLed() {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
-  statusPixel.begin();
-  statusPixelReady = true;
   setStatusLed(false); // Start with the RGB indicator off.
 #else
   pinMode(STATUS_LED_PIN, OUTPUT);
