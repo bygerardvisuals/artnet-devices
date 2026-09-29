@@ -46,8 +46,10 @@ function releaseAfterRestart(message){clearTimeout(saveTimer);connected=false;$(
 function onLine(line){if(!line.startsWith('ARCFG '))return;let reply=line.slice(6);if(reply[0]==='{'){try{fill(JSON.parse(reply))}catch{say('El ESP32 devolvió una configuración no válida.','bad')}}else if(reply[0]==='['){try{fillNetworks(JSON.parse(reply))}catch{say('La búsqueda de redes devolvió datos no válidos.','bad')}}else if(reply==='OK'){releaseAfterRestart('Guardado. El ESP32 se está reiniciando.')}else if(reply.startsWith('ERROR')){clearTimeout(saveTimer);say(reply,'bad');$('save').disabled=false}}
 async function readLoop(){const decoder=new TextDecoder();try{while(port?.readable){reader=port.readable.getReader();try{while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let lines=buffer.split(/\r?\n/);buffer=lines.pop();lines.forEach(onLine)}}finally{reader.releaseLock();reader=null}}}catch(e){if(connected)say('Conexión USB cerrada: '+e.message,'bad')}}
 async function send(command){if(!writer)throw new Error('No hay puerto USB conectado');await writer.write(new TextEncoder().encode(command+'\n'))}
-function resetPage(){location.reload()}
-async function closePort(){connected=false;try{if(reader)reader.cancel();if(writer)writer.releaseLock()}catch{}resetPage()}
+// Chromium can freeze a page while cancelling an active Web Serial reader.
+// Navigating away releases the page-owned stream and its port safely, without
+// invoking that problematic cancellation path.
+function closePort(){connected=false;location.reload()}
 $('connect').onclick=async()=>{if(connected){closePort();return}if(!('serial'in navigator)){say('Web Serial solo está disponible en Chrome o Edge.','bad');return}try{$('connect').disabled=true;say('Selecciona el puerto del ESP32-C6…');port=await navigator.serial.requestPort();await port.open({baudRate:115200});writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar USB';readLoop();await send('ARCFG GET');say('Leyendo configuración del ESP32…')}catch(e){say(e.name==='NotFoundError'?'No se seleccionó ningún puerto.':('No se pudo abrir USB: '+e.message),'bad');connected=false;port=null;writer=null}finally{$('connect').disabled=false}};
 $('scan').onclick=async()=>{if(!connected)return;try{$('scan').disabled=true;say('Buscando redes desde el ESP32…');await send('ARCFG SCAN')}catch(e){say('No se pudo buscar redes: '+e.message,'bad');$('scan').disabled=false}};
 $('wifiNetworks').onchange=e=>{if(e.target.value)$('wifiSsid').value=e.target.value};
