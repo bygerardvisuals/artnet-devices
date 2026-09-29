@@ -22,3 +22,5 @@ npm run dist:linux  # AppImage y .deb
 ```
 
 Antes de empaquetar se incorpora automáticamente `web-installer/firmware/merged-firmware.bin` de ESP32‑C6 a la aplicación. La pestaña de configuración conecta por Wi‑Fi con el panel del ESP32, que incluye su actualización OTA.
+
+El flujo GitHub Actions **Build desktop installers** crea los paquetes de macOS, Windows y Linux como artefactos descargables en cada publicación del proyecto.
