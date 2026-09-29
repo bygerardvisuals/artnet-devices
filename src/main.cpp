@@ -270,6 +270,19 @@ String configJson() {
          "\",\"ssid\":\"" + jsonEscape(ssid) + "\",\"ap\":" + (accessPointMode ? "true" : "false") + "}";
 }
 
+String wifiScanJson() {
+  int count = WiFi.scanNetworks();
+  String result = "[";
+  for (int i = 0; i < count; ++i) {
+    if (i) result += ',';
+    result += '"';
+    result += jsonEscape(WiFi.SSID(i));
+    result += '"';
+  }
+  WiFi.scanDelete();
+  return result + "]";
+}
+
 String safeHostname() {
   String host = config.name;
   host.toLowerCase();
@@ -401,6 +414,10 @@ void processSerialCommand(const String& command) {
       delay(1000);
       ESP.restart();
     }
+    return;
+  }
+  if (command == "ARCFG SCAN") {
+    Serial.println(String("ARCFG ") + wifiScanJson());
     return;
   }
   if (command == "ARCFG PING") Serial.println("ARCFG PONG");
