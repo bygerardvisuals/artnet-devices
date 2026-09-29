@@ -3,6 +3,11 @@
   "productName": "Art-Net Relay",
   "version": "1.0.0",
   "description": "Instalador y configurador de escritorio para ESP32 Art-Net Relay",
+  "homepage": "https://github.com/bygerardvisuals/artnet-relay-esp32c6",
+  "author": {
+    "name": "bygerardvisuals",
+    "email": "bygerardvisuals@users.noreply.github.com"
+  },
   "main": "main.cjs",
   "scripts": {
     "sync-firmware": "node scripts/sync-firmware.cjs",
@@ -28,6 +33,9 @@
     ],
     "mac": { "target": ["dmg", "zip"] },
     "win": { "target": ["nsis"] },
-    "linux": { "target": ["AppImage", "deb"] }
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "maintainer": "bygerardvisuals <bygerardvisuals@users.noreply.github.com>"
+    }
   }
 }
