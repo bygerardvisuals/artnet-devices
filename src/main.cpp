@@ -28,7 +28,6 @@ constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
 // by their PlatformIO environment when necessary.
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
 constexpr uint8_t STATUS_RGB_PIN = 8;
-#include "esp32-hal-rmt.h"
 #else
   #ifndef STATUS_LED_PIN
     #ifdef LED_BUILTIN
@@ -165,24 +164,9 @@ void saveConfig() {
 
 void setStatusLed(bool on) {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
-  // The Arduino rgbLedWrite() helper waits forever for an RMT completion. On
-  // some C6 SuperMini revisions that can starve the watchdog at startup.
-  // Initialise the RMT channel once and use a bounded write instead.
-  static bool ready = false;
-  if (!ready) {
-    ready = rmtInit(STATUS_RGB_PIN, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10000000);
-    if (!ready) return;
-  }
-  rmt_data_t data[24];
-  const uint8_t value = on ? 255 : 0;
-  for (uint8_t bit = 0; bit < 24; ++bit) {
-    const bool high = value & (1 << (7 - (bit % 8)));
-    data[bit].level0 = 1;
-    data[bit].duration0 = high ? 8 : 4;
-    data[bit].level1 = 0;
-    data[bit].duration1 = high ? 4 : 8;
-  }
-  rmtWrite(STATUS_RGB_PIN, data, RMT_SYMBOLS_OF(data), 10);
+  // GPIO 8 is the SuperMini's integrated WS2812.  The Arduino helper handles
+  // its timing and makes it white for ON, off for OFF.
+  rgbLedWrite(STATUS_RGB_PIN, on ? 255 : 0, on ? 255 : 0, on ? 255 : 0);
 #else
   digitalWrite(STATUS_LED_PIN, (on ^ STATUS_LED_INVERTED) ? HIGH : LOW);
 #endif
@@ -190,6 +174,7 @@ void setStatusLed(bool on) {
 
 void setupStatusLed() {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
+  // Start with the RGB indicator off.
   setStatusLed(false);
 #else
   pinMode(STATUS_LED_PIN, OUTPUT);
