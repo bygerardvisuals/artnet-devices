@@ -1,12 +1,12 @@
 {
   "name": "Art-Net Relay",
-  "version": "1.0.5-rgb",
+  "version": "1.0.6-led",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-C6",
       "parts": [
-        { "path": "firmware/artnet-relay-esp32c6-supermini-rgb-v5.bin", "offset": 0 }
+        { "path": "firmware/artnet-relay-esp32c6-supermini-led-v6.bin", "offset": 0 }
       ]
     },
     {

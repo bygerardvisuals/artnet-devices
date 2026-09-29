@@ -22,23 +22,17 @@ constexpr uint8_t DEFAULT_RELAY_PIN = 2;
 constexpr uint16_t DEFAULT_UNIVERSE = 0;
 constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
 
-// ESP32-C6 SuperMini has a WS2812 RGB status LED on GPIO 8.  It cannot be
-// driven with digitalWrite(); it needs the ESP32 RGB LED peripheral.  Other
-// boards use their ordinary built-in LED, with the pin and polarity supplied
-// by their PlatformIO environment when necessary.
-#if defined(CONFIG_IDF_TARGET_ESP32C6)
-constexpr uint8_t STATUS_RGB_PIN = 8;
-#else
-  #ifndef STATUS_LED_PIN
-    #ifdef LED_BUILTIN
-      #define STATUS_LED_PIN LED_BUILTIN
-    #else
-      #define STATUS_LED_PIN 2
-    #endif
+// Every target uses its board's built-in indicator as an ordinary GPIO. The
+// pin and polarity are supplied by its PlatformIO environment when needed.
+#ifndef STATUS_LED_PIN
+  #ifdef LED_BUILTIN
+    #define STATUS_LED_PIN LED_BUILTIN
+  #else
+    #define STATUS_LED_PIN 2
   #endif
-  #ifndef STATUS_LED_INVERTED
-    #define STATUS_LED_INVERTED 0
-  #endif
+#endif
+#ifndef STATUS_LED_INVERTED
+  #define STATUS_LED_INVERTED 0
 #endif
 
 struct Config {
@@ -163,22 +157,12 @@ void saveConfig() {
 #endif
 
 void setStatusLed(bool on) {
-#if defined(CONFIG_IDF_TARGET_ESP32C6)
-  // Arduino's C6 RGB driver owns the RMT peripheral safely.  The SuperMini
-  // LED is a single GRB WS2812 wired to GPIO 8.
-  rgbLedWrite(STATUS_RGB_PIN, on ? 255 : 0, on ? 255 : 0, on ? 255 : 0);
-#else
   digitalWrite(STATUS_LED_PIN, (on ^ STATUS_LED_INVERTED) ? HIGH : LOW);
-#endif
 }
 
 void setupStatusLed() {
-#if defined(CONFIG_IDF_TARGET_ESP32C6)
-  setStatusLed(false); // Start with the RGB indicator off.
-#else
   pinMode(STATUS_LED_PIN, OUTPUT);
   setStatusLed(false);
-#endif
 }
 
 void setRelay(bool on) {
