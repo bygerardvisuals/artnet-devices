@@ -28,6 +28,7 @@ constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
 // by their PlatformIO environment when necessary.
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
 constexpr uint8_t STATUS_RGB_PIN = 8;
+#include "esp32-hal-rmt.h"
 #else
   #ifndef STATUS_LED_PIN
     #ifdef LED_BUILTIN
@@ -164,8 +165,24 @@ void saveConfig() {
 
 void setStatusLed(bool on) {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
-  // White when Art-Net enables the relay, fully off otherwise.
-  rgbLedWrite(STATUS_RGB_PIN, on ? 255 : 0, on ? 255 : 0, on ? 255 : 0);
+  // The Arduino rgbLedWrite() helper waits forever for an RMT completion. On
+  // some C6 SuperMini revisions that can starve the watchdog at startup.
+  // Initialise the RMT channel once and use a bounded write instead.
+  static bool ready = false;
+  if (!ready) {
+    ready = rmtInit(STATUS_RGB_PIN, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10000000);
+    if (!ready) return;
+  }
+  rmt_data_t data[24];
+  const uint8_t value = on ? 255 : 0;
+  for (uint8_t bit = 0; bit < 24; ++bit) {
+    const bool high = value & (1 << (7 - (bit % 8)));
+    data[bit].level0 = 1;
+    data[bit].duration0 = high ? 8 : 4;
+    data[bit].level1 = 0;
+    data[bit].duration1 = high ? 4 : 8;
+  }
+  rmtWrite(STATUS_RGB_PIN, data, RMT_SYMBOLS_OF(data), 10);
 #else
   digitalWrite(STATUS_LED_PIN, (on ^ STATUS_LED_INVERTED) ? HIGH : LOW);
 #endif
@@ -173,8 +190,7 @@ void setStatusLed(bool on) {
 
 void setupStatusLed() {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
-  // rgbLedWrite configures the RMT output as needed, and starts with the LED off.
-  rgbLedWrite(STATUS_RGB_PIN, 0, 0, 0);
+  setStatusLed(false);
 #else
   pinMode(STATUS_LED_PIN, OUTPUT);
   setStatusLed(false);
@@ -324,13 +340,16 @@ void setupWebServer() {
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("Art-Net Relay: starting");
   loadConfig();
   pinMode(config.relayPin, OUTPUT);
   setupStatusLed();
   setRelay(false);
   startNetwork();
+  Serial.printf("Art-Net Relay: network ready (%s)\n", accessPointMode ? "AP" : WiFi.localIP().toString().c_str());
   artnet.begin(ARTNET_PORT);
   setupWebServer();
+  Serial.println("Art-Net Relay: ready");
 }
 
 void loop() {
