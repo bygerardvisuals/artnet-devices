@@ -12,7 +12,6 @@ Import("env")
 def merge_for_web_installer(source, target, env):
     project = Path(env.subst("$PROJECT_DIR"))
     build = Path(env.subst("$BUILD_DIR"))
-    framework = Path(env.PioPlatform().get_package_dir("framework-arduinoespressif32"))
     environment = env.subst("$PIOENV")
     destination = project / "web-installer" / "firmware" / f"artnet-relay-{environment}.bin"
     ota_destination = project / "web-installer" / "firmware" / f"artnet-relay-{environment}-ota.bin"
@@ -30,6 +29,8 @@ def merge_for_web_installer(source, target, env):
         shutil.copyfile(app_binary, destination)
         shutil.copyfile(app_binary, ota_destination)
         return
+
+    framework = Path(env.PioPlatform().get_package_dir("framework-arduinoespressif32"))
 
     command = [
         env.subst("$PYTHONEXE"),
