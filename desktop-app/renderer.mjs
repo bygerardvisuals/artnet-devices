@@ -3,6 +3,12 @@ import { ESPLoader, Transport } from './node_modules/esptool-js/bundle.js';
 const $ = (id) => document.getElementById(id);
 let base = '';
 const terminal = { clean: () => { $('terminal').textContent = ''; }, write: (text) => { $('terminal').textContent += text; }, writeLine: (text) => { $('terminal').textContent += `${text}\n`; } };
+const boards = {
+  'esp32c6-supermini': { label: 'ESP32-C6 SuperMini', chip: 'ESP32-C6' },
+  'esp32c3-supermini': { label: 'ESP32-C3 SuperMini', chip: 'ESP32-C3' },
+  esp32dev: { label: 'ESP32 clásico', chip: 'ESP32' },
+  'wemos-d1-mini': { label: 'ESP8266 / Wemos D1 mini / NodeMCU', chip: 'ESP8266' }
+};
 
 document.querySelectorAll('[data-tab]').forEach((button) => button.onclick = () => {
   document.querySelectorAll('[data-tab],.tab').forEach((item) => item.classList.remove('active'));
@@ -28,6 +34,7 @@ $('refresh').onclick = refreshPorts;
 
 $('flash').onclick = async () => {
   const portId = $('ports').value;
+  const board = boards[$('board').value];
   if (!portId) return refreshPorts();
   $('flash').disabled = true; $('progress').value = 0; terminal.clean();
   try {
@@ -37,8 +44,8 @@ $('flash').onclick = async () => {
     const transport = new Transport(port);
     const loader = new ESPLoader({ transport, baudrate: 115200, terminal });
     const chip = await loader.main();
-    if (!String(chip).includes('ESP32-C6')) throw new Error(`Este firmware es para ESP32‑C6; se detectó ${chip}.`);
-    const firmware = new Uint8Array(await window.relayDesktop.firmware());
+    if (!String(chip).includes(board.chip)) throw new Error(`Has elegido ${board.label}, pero se detectó ${chip}.`);
+    const firmware = new Uint8Array(await window.relayDesktop.firmware($('board').value));
     $('flashStatus').textContent = 'Grabando firmware…';
     await loader.writeFlash({ fileArray: [{ data: firmware, address: 0 }], flashSize: '4MB', flashMode: 'dio', flashFreq: '40m', eraseAll: true, compress: true, reportProgress: (_index, written, total) => { $('progress').value = Math.round(written / total * 100); } });
     await loader.after('hard_reset');

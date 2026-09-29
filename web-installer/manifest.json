@@ -6,7 +6,25 @@
     {
       "chipFamily": "ESP32-C6",
       "parts": [
-        { "path": "firmware/merged-firmware.bin", "offset": 0 }
+        { "path": "firmware/artnet-relay-esp32c6-supermini.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-C3",
+      "parts": [
+        { "path": "firmware/artnet-relay-esp32c3-supermini.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "firmware/artnet-relay-esp32dev.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP8266",
+      "parts": [
+        { "path": "firmware/artnet-relay-wemos-d1-mini.bin", "offset": 0 }
       ]
     }
   ]

@@ -1,10 +1,18 @@
 #include <Arduino.h>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <EEPROM.h>
+#include <Updater.h>
+#else
 #include <WiFi.h>
 #include <WebServer.h>
 #include <WiFiUdp.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #include <Update.h>
+#endif
 
 // ESP32 Art-Net Relay
 // Default relay pin is GPIO 2. It can be changed from the web interface.
@@ -13,6 +21,25 @@ constexpr uint16_t ARTNET_PORT = 6454;
 constexpr uint8_t DEFAULT_RELAY_PIN = 2;
 constexpr uint16_t DEFAULT_UNIVERSE = 0;
 constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
+
+// ESP32-C6 SuperMini has a WS2812 RGB status LED on GPIO 8.  It cannot be
+// driven with digitalWrite(); it needs the ESP32 RGB LED peripheral.  Other
+// boards use their ordinary built-in LED, with the pin and polarity supplied
+// by their PlatformIO environment when necessary.
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+constexpr uint8_t STATUS_RGB_PIN = 8;
+#else
+  #ifndef STATUS_LED_PIN
+    #ifdef LED_BUILTIN
+      #define STATUS_LED_PIN LED_BUILTIN
+    #else
+      #define STATUS_LED_PIN 2
+    #endif
+  #endif
+  #ifndef STATUS_LED_INVERTED
+    #define STATUS_LED_INVERTED 0
+  #endif
+#endif
 
 struct Config {
   String wifiSsid;
@@ -25,8 +52,12 @@ struct Config {
 };
 
 Config config;
+#if defined(ESP8266)
+ESP8266WebServer server(80);
+#else
 Preferences prefs;
 WebServer server(80);
+#endif
 WiFiUDP artnet;
 bool accessPointMode = false;
 bool relayState = false;
@@ -53,9 +84,58 @@ $('updateForm').onsubmit=async e=>{e.preventDefault();let f=$('firmware').files[
 </script></body></html>)rawliteral";
 
 String preferenceString(const char* key, const String& fallback = "") {
+#if defined(ESP8266)
+  (void)key;
+  return fallback;
+#else
   return prefs.getString(key, fallback);
+#endif
 }
 
+#if defined(ESP8266)
+constexpr uint32_t CONFIG_MAGIC = 0x41524E54; // "ARNT"
+struct StoredConfig {
+  uint32_t magic;
+  char wifiSsid[33];
+  char wifiPassword[64];
+  char name[64];
+  uint16_t universe;
+  uint16_t channel;
+  uint8_t relayPin;
+  bool relayInverted;
+};
+
+void loadConfig() {
+  EEPROM.begin(sizeof(StoredConfig));
+  StoredConfig stored = {};
+  EEPROM.get(0, stored);
+  if (stored.magic == CONFIG_MAGIC) {
+    config.wifiSsid = stored.wifiSsid;
+    config.wifiPassword = stored.wifiPassword;
+    config.name = stored.name;
+    config.universe = stored.universe;
+    config.channel = stored.channel;
+    config.relayPin = stored.relayPin;
+    config.relayInverted = stored.relayInverted;
+  }
+  if (config.name.length() == 0) config.name = "ArtNet Relay";
+  if (config.channel < 1 || config.channel > 512) config.channel = DEFAULT_CHANNEL;
+}
+
+void saveConfig() {
+  StoredConfig stored = {};
+  stored.magic = CONFIG_MAGIC;
+  strncpy(stored.wifiSsid, config.wifiSsid.c_str(), sizeof(stored.wifiSsid) - 1);
+  strncpy(stored.wifiPassword, config.wifiPassword.c_str(), sizeof(stored.wifiPassword) - 1);
+  strncpy(stored.name, config.name.c_str(), sizeof(stored.name) - 1);
+  stored.universe = config.universe;
+  stored.channel = config.channel;
+  stored.relayPin = config.relayPin;
+  stored.relayInverted = config.relayInverted;
+  EEPROM.put(0, stored);
+  EEPROM.commit();
+}
+#else
 void loadConfig() {
   prefs.begin("artnetrelay", true);
   config.wifiSsid = preferenceString("ssid");
@@ -80,10 +160,31 @@ void saveConfig() {
   prefs.putBool("inverted", config.relayInverted);
   prefs.end();
 }
+#endif
+
+void setStatusLed(bool on) {
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+  // White when Art-Net enables the relay, fully off otherwise.
+  rgbLedWrite(STATUS_RGB_PIN, on ? 255 : 0, on ? 255 : 0, on ? 255 : 0);
+#else
+  digitalWrite(STATUS_LED_PIN, (on ^ STATUS_LED_INVERTED) ? HIGH : LOW);
+#endif
+}
+
+void setupStatusLed() {
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+  // rgbLedWrite configures the RMT output as needed, and starts with the LED off.
+  rgbLedWrite(STATUS_RGB_PIN, 0, 0, 0);
+#else
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  setStatusLed(false);
+#endif
+}
 
 void setRelay(bool on) {
   relayState = on;
   digitalWrite(config.relayPin, (on ^ config.relayInverted) ? HIGH : LOW);
+  setStatusLed(on);
 }
 
 String jsonValue(const String& body, const char* key) {
@@ -113,7 +214,11 @@ String safeHostname() {
 
 void startNetwork() {
   WiFi.mode(WIFI_STA);
+#if defined(ESP8266)
+  WiFi.hostname(safeHostname());
+#else
   WiFi.setHostname(safeHostname().c_str());
+#endif
   if (config.wifiSsid.length()) {
     WiFi.begin(config.wifiSsid.c_str(), config.wifiPassword.c_str());
     uint32_t started = millis();
@@ -171,7 +276,9 @@ void receiveArtnet() {
 
 void setupWebServer() {
   // Allows the local Chrome configurator to call this device while it is on its setup AP.
+#if !defined(ESP8266)
   server.enableCORS(true);
+#endif
   server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/api/status", HTTP_GET, [] {
     String ip = accessPointMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
@@ -219,6 +326,7 @@ void setup() {
   Serial.begin(115200);
   loadConfig();
   pinMode(config.relayPin, OUTPUT);
+  setupStatusLed();
   setRelay(false);
   startNetwork();
   artnet.begin(ARTNET_PORT);

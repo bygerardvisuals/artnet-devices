@@ -10,9 +10,25 @@ on:
       - .github/workflows/build-desktop.yml
 
 jobs:
+  firmware:
+    name: Firmware images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install platformio
+      - run: pio run -e esp32c6-supermini -e esp32c3-supermini -e esp32dev -e wemos-d1-mini
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-images
+          path: web-installer/firmware/artnet-relay-*.bin
+          if-no-files-found: error
   package:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    needs: firmware
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +44,10 @@ jobs:
             target: linux
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware-images
+          path: web-installer/firmware
       - uses: actions/setup-node@v4
         with:
           node-version: 22

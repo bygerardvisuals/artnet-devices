@@ -4,10 +4,11 @@ const path = require('node:path');
 
 let selectedPorts = new Map();
 
-function firmwarePath() {
+function firmwarePath(target) {
+  const file = `artnet-relay-${target}.bin`;
   return app.isPackaged
-    ? path.join(process.resourcesPath, 'app.asar', 'firmware', 'merged-firmware.bin')
-    : path.join(__dirname, 'firmware', 'merged-firmware.bin');
+    ? path.join(process.resourcesPath, 'app.asar', 'firmware', file)
+    : path.join(__dirname, 'firmware', file);
 }
 
 function createWindow() {
@@ -41,7 +42,7 @@ function createWindow() {
 app.whenReady().then(() => {
   ipcMain.handle('serial-ports', () => session.defaultSession.getAllSerialPorts());
   ipcMain.handle('select-serial-port', (event, portId) => selectedPorts.set(event.sender.id, portId));
-  ipcMain.handle('firmware', () => fs.readFileSync(firmwarePath()));
+  ipcMain.handle('firmware', (_event, target) => fs.readFileSync(firmwarePath(target)));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
