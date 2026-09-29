@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Instalador Art-Net Relay</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root { color-scheme: dark; --orange:#ff9f1c; --panel:#1d2430; --line:#344052; }
+    * { box-sizing:border-box } body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at top,#273451,#11151c 55%); color:#eef3fa; font:16px system-ui,sans-serif; }
+    main { width:min(580px,100%); background:linear-gradient(145deg,#202937,#1a202b); border:1px solid var(--line); border-radius:16px; padding:32px; box-shadow:0 20px 60px #0007; }
+    .logo { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; color:#17202a; background:var(--orange); font-size:22px; font-weight:800; } h1 { font-size:27px; margin:18px 0 9px; } p,li { color:#b8c3d4; line-height:1.6; } .box { margin:22px 0; padding:17px; border:1px solid var(--line); border-radius:11px; background:#131a24; }
+    esp-web-install-button { --esp-tools-button-color:var(--orange); --esp-tools-button-text-color:#17202a; --esp-tools-button-border-radius:8px; } button { font:700 16px system-ui,sans-serif; padding:11px 18px; cursor:pointer; } code { color:#ffd08a; } small { color:#8490a2; }
+  </style>
+</head>
+<body><main>
+  <div class="logo">A</div>
+  <h1>Art‑Net Relay</h1>
+  <p>Graba el firmware directamente desde Google Chrome, sin instalar una herramienta de flasheo.</p>
+  <div class="box">
+    <p><b>1.</b> Conecta el ESP32 por USB.</p>
+    <p><b>2.</b> Pulsa instalar y selecciona el puerto serie correcto. Si no aparece, mantén pulsado <b>BOOT</b>, pulsa <b>RST</b> una vez y vuelve a intentarlo.</p>
+    <p><b>3.</b> Al acabar, conecta el móvil u ordenador a <b>ArtNet-Relay-Setup</b> para configurar Wi‑Fi y Art‑Net.</p>
+    <esp-web-install-button manifest="manifest.json"><button slot="activate">Instalar en el ESP32</button><span slot="unsupported">Abre esta página en Chrome o Edge por HTTPS o desde <code>localhost</code>.</span></esp-web-install-button>
+  </div>
+  <p><a href="configure.html">Ya está instalado: abrir configurador en Chrome →</a></p>
+  <small>Esta compilación es para ESP32‑C6 SuperMini (4 MB). No usar con ESP32 clásico, C3, S2 o S3.</small>
+</main></body>
+</html>

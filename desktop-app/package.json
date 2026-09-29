@@ -1,0 +1,33 @@
+{
+  "name": "artnet-relay-desktop",
+  "productName": "Art-Net Relay",
+  "version": "1.0.0",
+  "description": "Instalador y configurador de escritorio para ESP32 Art-Net Relay",
+  "main": "main.cjs",
+  "scripts": {
+    "sync-firmware": "node scripts/sync-firmware.cjs",
+    "start": "npm run sync-firmware && electron .",
+    "dist": "npm run sync-firmware && electron-builder",
+    "dist:mac": "npm run sync-firmware && electron-builder --mac",
+    "dist:win": "npm run sync-firmware && electron-builder --win",
+    "dist:linux": "npm run sync-firmware && electron-builder --linux"
+  },
+  "dependencies": {
+    "esptool-js": "^0.7.0"
+  },
+  "devDependencies": {
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.19"
+  },
+  "build": {
+    "appId": "com.artnetrelay.desktop",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "**/*"
+    ],
+    "mac": { "target": ["dmg", "zip"] },
+    "win": { "target": ["nsis"] },
+    "linux": { "target": ["AppImage", "deb"] }
+  }
+}
