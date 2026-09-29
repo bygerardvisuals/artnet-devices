@@ -38,6 +38,10 @@ constexpr uint16_t DEFAULT_CHANNEL = 1; // DMX channels are 1-based.
 struct Config {
   String wifiSsid;
   String wifiPassword;
+  bool staticIpEnabled = false;
+  String staticIp;
+  String gateway;
+  String subnet = "255.255.255.0";
   String name = "ArtNet Relay";
   uint16_t universe = DEFAULT_UNIVERSE;
   uint16_t channel = DEFAULT_CHANNEL;
@@ -87,11 +91,15 @@ String preferenceString(const char* key, const String& fallback = "") {
 }
 
 #if defined(ESP8266)
-constexpr uint32_t CONFIG_MAGIC = 0x41524E54; // "ARNT"
+constexpr uint32_t CONFIG_MAGIC = 0x41524E55; // "ARNU" (USB-config capable layout)
 struct StoredConfig {
   uint32_t magic;
   char wifiSsid[33];
   char wifiPassword[64];
+  bool staticIpEnabled;
+  char staticIp[16];
+  char gateway[16];
+  char subnet[16];
   char name[64];
   uint16_t universe;
   uint16_t channel;
@@ -106,6 +114,10 @@ void loadConfig() {
   if (stored.magic == CONFIG_MAGIC) {
     config.wifiSsid = stored.wifiSsid;
     config.wifiPassword = stored.wifiPassword;
+    config.staticIpEnabled = stored.staticIpEnabled;
+    config.staticIp = stored.staticIp;
+    config.gateway = stored.gateway;
+    config.subnet = stored.subnet;
     config.name = stored.name;
     config.universe = stored.universe;
     config.channel = stored.channel;
@@ -121,6 +133,10 @@ void saveConfig() {
   stored.magic = CONFIG_MAGIC;
   strncpy(stored.wifiSsid, config.wifiSsid.c_str(), sizeof(stored.wifiSsid) - 1);
   strncpy(stored.wifiPassword, config.wifiPassword.c_str(), sizeof(stored.wifiPassword) - 1);
+  stored.staticIpEnabled = config.staticIpEnabled;
+  strncpy(stored.staticIp, config.staticIp.c_str(), sizeof(stored.staticIp) - 1);
+  strncpy(stored.gateway, config.gateway.c_str(), sizeof(stored.gateway) - 1);
+  strncpy(stored.subnet, config.subnet.c_str(), sizeof(stored.subnet) - 1);
   strncpy(stored.name, config.name.c_str(), sizeof(stored.name) - 1);
   stored.universe = config.universe;
   stored.channel = config.channel;
@@ -134,6 +150,10 @@ void loadConfig() {
   prefs.begin("artnetrelay", true);
   config.wifiSsid = preferenceString("ssid");
   config.wifiPassword = preferenceString("password");
+  config.staticIpEnabled = prefs.getBool("static", false);
+  config.staticIp = preferenceString("ip");
+  config.gateway = preferenceString("gateway");
+  config.subnet = preferenceString("subnet", config.subnet);
   config.name = preferenceString("name", config.name);
   config.universe = prefs.getUShort("universe", DEFAULT_UNIVERSE);
   config.channel = prefs.getUShort("channel", DEFAULT_CHANNEL);
@@ -147,6 +167,10 @@ void saveConfig() {
   prefs.begin("artnetrelay", false);
   prefs.putString("ssid", config.wifiSsid);
   prefs.putString("password", config.wifiPassword);
+  prefs.putBool("static", config.staticIpEnabled);
+  prefs.putString("ip", config.staticIp);
+  prefs.putString("gateway", config.gateway);
+  prefs.putString("subnet", config.subnet);
   prefs.putString("name", config.name);
   prefs.putUShort("universe", config.universe);
   prefs.putUShort("channel", config.channel);
@@ -184,6 +208,68 @@ String jsonValue(const String& body, const char* key) {
   return body.substring(start, end);
 }
 
+String jsonEscape(const String& value) {
+  String escaped;
+  escaped.reserve(value.length() + 8);
+  for (size_t i = 0; i < value.length(); ++i) {
+    char c = value[i];
+    if (c == '\\' || c == '"') escaped += '\\';
+    if (c == '\n' || c == '\r') continue;
+    escaped += c;
+  }
+  return escaped;
+}
+
+bool isValidIp(const String& value) {
+  IPAddress address;
+  return address.fromString(value);
+}
+
+bool applyConfigJson(const String& body) {
+  String name = jsonValue(body, "deviceName");
+  String universe = jsonValue(body, "artnetUniverse");
+  String channel = jsonValue(body, "artnetChannel");
+  String pin = jsonValue(body, "relayPin");
+  String inverted = jsonValue(body, "relayInverted");
+  String ssid = jsonValue(body, "wifiSsid");
+  String password = jsonValue(body, "wifiPassword");
+  String staticEnabled = jsonValue(body, "staticIpEnabled");
+  String staticIp = jsonValue(body, "staticIp");
+  String gateway = jsonValue(body, "gateway");
+  String subnet = jsonValue(body, "subnet");
+  if (name.length()) config.name = name.substring(0, 63);
+  if (universe.length()) config.universe = constrain(universe.toInt(), 0, 32767);
+  if (channel.length()) config.channel = constrain(channel.toInt(), 1, 512);
+  if (pin.length()) config.relayPin = constrain(pin.toInt(), 0, 39);
+  if (inverted.length()) config.relayInverted = inverted == "true";
+  if (ssid.length()) config.wifiSsid = ssid.substring(0, 32);
+  // An empty password means "keep the saved password", which lets the USB
+  // configurator read settings without ever exposing credentials.
+  if (password.length()) config.wifiPassword = password.substring(0, 63);
+  if (staticEnabled.length()) config.staticIpEnabled = staticEnabled == "true";
+  if (staticIp.length()) config.staticIp = staticIp;
+  if (gateway.length()) config.gateway = gateway;
+  if (subnet.length()) config.subnet = subnet;
+  if (config.staticIpEnabled && (!isValidIp(config.staticIp) || !isValidIp(config.gateway) || !isValidIp(config.subnet))) return false;
+  saveConfig();
+  return true;
+}
+
+String configJson() {
+  String ip = accessPointMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
+  String ssid = accessPointMode ? "ArtNet-Relay-Setup" : WiFi.SSID();
+  uint32_t age = lastDmxMillis ? millis() - lastDmxMillis : 0;
+  return "{\"name\":\"" + jsonEscape(config.name) + "\",\"deviceName\":\"" + jsonEscape(config.name) +
+         "\",\"universe\":" + config.universe + ",\"artnetUniverse\":" + config.universe +
+         ",\"channel\":" + config.channel + ",\"artnetChannel\":" + config.channel +
+         ",\"relayPin\":" + config.relayPin + ",\"relayInverted\":" + (config.relayInverted ? "true" : "false") +
+         ",\"wifiSsid\":\"" + jsonEscape(config.wifiSsid) + "\",\"staticIpEnabled\":" + (config.staticIpEnabled ? "true" : "false") +
+         ",\"staticIp\":\"" + jsonEscape(config.staticIp) + "\",\"gateway\":\"" + jsonEscape(config.gateway) +
+         "\",\"subnet\":\"" + jsonEscape(config.subnet) + "\",\"relay\":" + (relayState ? "true" : "false") +
+         ",\"value\":" + lastDmxValue + ",\"lastSeen\":" + age + ",\"ip\":\"" + ip +
+         "\",\"ssid\":\"" + jsonEscape(ssid) + "\",\"ap\":" + (accessPointMode ? "true" : "false") + "}";
+}
+
 String safeHostname() {
   String host = config.name;
   host.toLowerCase();
@@ -204,6 +290,12 @@ void startNetwork() {
   WiFi.setHostname(safeHostname().c_str());
 #endif
   if (config.wifiSsid.length()) {
+    if (config.staticIpEnabled) {
+      IPAddress ip, gateway, subnet;
+      if (ip.fromString(config.staticIp) && gateway.fromString(config.gateway) && subnet.fromString(config.subnet)) {
+        WiFi.config(ip, gateway, subnet);
+      }
+    }
     WiFi.begin(config.wifiSsid.c_str(), config.wifiPassword.c_str());
     uint32_t started = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - started < 15000) delay(250);
@@ -265,30 +357,13 @@ void setupWebServer() {
 #endif
   server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/api/status", HTTP_GET, [] {
-    String ip = accessPointMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
-    String ssid = accessPointMode ? "ArtNet-Relay-Setup" : WiFi.SSID();
-    uint32_t age = lastDmxMillis ? millis() - lastDmxMillis : 0;
-    String result = "{\"name\":\"" + config.name + "\",\"universe\":" + config.universe + ",\"channel\":" + config.channel + ",\"relayPin\":" + config.relayPin + ",\"relayInverted\":" + (config.relayInverted ? "true" : "false") + ",\"relay\":" + (relayState ? "true" : "false") + ",\"value\":" + lastDmxValue + ",\"lastSeen\":" + age + ",\"ip\":\"" + ip + "\",\"ssid\":\"" + ssid + "\",\"ap\":" + (accessPointMode ? "true" : "false") + "}";
-    server.send(200, "application/json", result);
+    server.send(200, "application/json", configJson());
   });
   server.on("/api/config", HTTP_POST, [] {
     String body = server.arg("plain");
-    String name = jsonValue(body, "deviceName");
-    String universe = jsonValue(body, "artnetUniverse");
-    String channel = jsonValue(body, "artnetChannel");
-    String pin = jsonValue(body, "relayPin");
-    String inverted = jsonValue(body, "relayInverted");
-    String ssid = jsonValue(body, "wifiSsid");
-    String password = jsonValue(body, "wifiPassword");
-    if (name.length()) config.name = name;
-    if (universe.length()) config.universe = constrain(universe.toInt(), 0, 32767);
-    if (channel.length()) config.channel = constrain(channel.toInt(), 1, 512);
-    if (pin.length()) config.relayPin = constrain(pin.toInt(), 0, 39);
-    if (inverted.length()) config.relayInverted = inverted == "true";
-    if (ssid.length()) config.wifiSsid = ssid;
-    if (password.length()) config.wifiPassword = password;
-    saveConfig();
-    server.send(200, "application/json", "{\"ok\":true}");
+    bool ok = applyConfigJson(body);
+    server.send(ok ? 200 : 400, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"IP inválida\"}");
+    if (!ok) return;
     delay(700);
     ESP.restart();
   });
@@ -304,6 +379,43 @@ void setupWebServer() {
     else if (upload.status == UPLOAD_FILE_END) Update.end(true);
   });
   server.begin();
+}
+
+// USB configuration protocol used by the Chrome installer.  Normal boot logs
+// are intentionally left untouched; machine-readable replies always start
+// with "ARCFG " so the browser can safely ignore everything else.
+String serialCommand;
+
+void processSerialCommand(const String& command) {
+  if (command == "ARCFG GET") {
+    Serial.println(String("ARCFG ") + configJson());
+    return;
+  }
+  if (command.startsWith("ARCFG SET ")) {
+    bool ok = applyConfigJson(command.substring(10));
+    Serial.println(ok ? "ARCFG OK" : "ARCFG ERROR IP inválida");
+    if (ok) {
+      delay(500);
+      ESP.restart();
+    }
+    return;
+  }
+  if (command == "ARCFG PING") Serial.println("ARCFG PONG");
+}
+
+void handleSerialConfig() {
+  while (Serial.available()) {
+    char c = static_cast<char>(Serial.read());
+    if (c == '\r') continue;
+    if (c == '\n') {
+      if (serialCommand.length()) processSerialCommand(serialCommand);
+      serialCommand = "";
+    } else if (serialCommand.length() < 768) {
+      serialCommand += c;
+    } else {
+      serialCommand = "";
+    }
+  }
 }
 
 void setup() {
@@ -323,4 +435,5 @@ void setup() {
 void loop() {
   server.handleClient();
   receiveArtnet();
+  handleSerialConfig();
 }

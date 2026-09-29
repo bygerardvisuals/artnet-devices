@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configurar Art-Net Relay por USB</title>
+  <style>
+    :root{color-scheme:dark;--orange:#ff9f1c;--panel:#1d2430;--line:#344052;--muted:#b8c3d4;--ok:#46dc88;--bad:#ff7180}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#273451,#11151c 55%);color:#eef3fa;font:16px system-ui,sans-serif}main{width:min(920px,100%);margin:0 auto;padding:30px 20px 52px}.logo{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:var(--orange);color:#17202a;font-weight:900;font-size:22px}h1{margin:16px 0 7px}p{line-height:1.55;color:var(--muted)}.top,.grid{display:grid;gap:16px}.top{grid-template-columns:1fr auto;align-items:center;margin:24px 0}.grid{grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}.card{padding:21px;background:linear-gradient(145deg,#202937,#1a202b);border:1px solid var(--line);border-radius:14px}.card h2{font-size:18px;margin:0 0 12px}.wide{grid-column:1/-1}label{display:block;margin:13px 0 6px;font-size:13px;color:#c8d2e0}input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#111720;color:#eef3fa;font:inherit}input:focus{outline:2px solid #ff9f1c88;border-color:var(--orange)}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.check{display:flex;align-items:center;gap:9px;margin-top:14px;color:#dce5f2}.check input{width:auto}button{border:0;border-radius:8px;padding:11px 15px;background:var(--orange);color:#17202a;font:700 15px system-ui;cursor:pointer}button.secondary{background:#293649;color:#eef3fa;border:1px solid var(--line)}button:disabled{opacity:.52;cursor:wait}.status{min-height:25px;color:var(--muted)}.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}.note{font-size:13px;padding:12px;border-radius:8px;background:#131a24}.hidden{display:none}@media(max-width:600px){.top,.row{grid-template-columns:1fr}.top button{width:100%}}
+  </style>
+</head>
+<body><main>
+  <div class="logo">A</div>
+  <h1>Configurar por USB</h1>
+  <p>Igual que el instalador: conecta el ESP32 por USB, pulsa conectar y ajusta el relay sin cambiar la Wi‑Fi del ordenador.</p>
+  <div class="top"><div id="status" class="status">Conecta el C6 por USB y pulsa “Conectar por USB”.</div><button id="connect">Conectar por USB</button></div>
+  <form id="config" class="grid">
+    <section class="card"><h2>Identidad y Art‑Net</h2>
+      <label>Nombre del dispositivo</label><input id="deviceName" maxlength="63" required placeholder="ArtNet Relay">
+      <div class="row"><div><label>Universo Art‑Net</label><input id="artnetUniverse" type="number" min="0" max="32767" required value="0"></div><div><label>Canal DMX</label><input id="artnetChannel" type="number" min="1" max="512" required value="1"></div></div>
+    </section>
+    <section class="card"><h2>Salida de relé</h2>
+      <div class="row"><div><label>GPIO del relé</label><input id="relayPin" type="number" min="0" max="48" required value="2"></div><div><label>Polaridad</label><select id="relayInverted"><option value="false">Activo en HIGH</option><option value="true">Activo en LOW</option></select></div></div>
+      <p class="note">DMX 0–127 apaga; 128–255 enciende. Para negro/blanco envía 0/255.</p>
+    </section>
+    <section class="card"><h2>Wi‑Fi</h2>
+      <label>Nombre de red (SSID)</label><input id="wifiSsid" maxlength="32" placeholder="Mi red Wi‑Fi">
+      <label>Contraseña</label><input id="wifiPassword" maxlength="63" type="password" placeholder="Vacío = conservar la guardada">
+      <p class="note">La contraseña guardada nunca se lee ni se muestra por USB.</p>
+    </section>
+    <section class="card"><h2>Dirección IP</h2>
+      <label class="check"><input id="staticIpEnabled" type="checkbox"> Usar IP estática</label>
+      <div id="staticFields" class="hidden"><label>IP</label><input id="staticIp" inputmode="decimal" placeholder="192.168.1.50"><div class="row"><div><label>Puerta de enlace</label><input id="gateway" inputmode="decimal" placeholder="192.168.1.1"></div><div><label>Máscara</label><input id="subnet" inputmode="decimal" value="255.255.255.0"></div></div></div>
+      <p class="note">Si no se activa, el router asignará la IP por DHCP.</p>
+    </section>
+    <section class="card wide"><h2>Guardar</h2><p>El dispositivo se reiniciará al guardar. La conexión USB se liberará automáticamente.</p><button id="save" type="submit" disabled>Guardar configuración y reiniciar</button></section>
+  </form>
+</main><script>
+const $=id=>document.getElementById(id), status=$('status');let port,reader,writer,buffer='',connected=false;
+function say(message,type=''){status.textContent=message;status.className='status '+type}
+function showStatic(){ $('staticFields').classList.toggle('hidden',!$('staticIpEnabled').checked) }
+$('staticIpEnabled').onchange=showStatic;
+function fill(c){$('deviceName').value=c.deviceName||c.name||'';$('artnetUniverse').value=c.artnetUniverse??c.universe??0;$('artnetChannel').value=c.artnetChannel??c.channel??1;$('relayPin').value=c.relayPin??2;$('relayInverted').value=String(!!c.relayInverted);$('wifiSsid').value=c.wifiSsid||'';$('staticIpEnabled').checked=!!c.staticIpEnabled;$('staticIp').value=c.staticIp||'';$('gateway').value=c.gateway||'';$('subnet').value=c.subnet||'255.255.255.0';showStatic();$('save').disabled=false;say('Configuración leída desde el ESP32.', 'ok')}
+function onLine(line){if(!line.startsWith('ARCFG '))return;let reply=line.slice(6);if(reply[0]==='{'){try{fill(JSON.parse(reply))}catch{say('El ESP32 devolvió una configuración no válida.','bad')}}else if(reply==='OK'){say('Guardado. El ESP32 se está reiniciando.', 'ok');closePort()}else if(reply.startsWith('ERROR'))say(reply,'bad')}
+async function readLoop(){const decoder=new TextDecoder();try{while(port?.readable){reader=port.readable.getReader();try{while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let lines=buffer.split(/\r?\n/);buffer=lines.pop();lines.forEach(onLine)}}finally{reader.releaseLock();reader=null}}}catch(e){if(connected)say('Conexión USB cerrada: '+e.message,'bad')}}
+async function send(command){if(!writer)throw new Error('No hay puerto USB conectado');await writer.write(new TextEncoder().encode(command+'\n'))}
+async function closePort(){connected=false;$('connect').textContent='Conectar por USB';$('save').disabled=true;try{if(reader)await reader.cancel();if(writer){writer.releaseLock();writer=null}if(port)await port.close()}catch{}port=null}
+$('connect').onclick=async()=>{if(connected){await closePort();say('Puerto USB desconectado.');return}if(!('serial'in navigator)){say('Web Serial solo está disponible en Chrome o Edge.','bad');return}try{$('connect').disabled=true;say('Selecciona el puerto del ESP32-C6…');port=await navigator.serial.requestPort();await port.open({baudRate:115200});writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar USB';readLoop();await send('ARCFG GET');say('Leyendo configuración del ESP32…')}catch(e){say(e.name==='NotFoundError'?'No se seleccionó ningún puerto.':('No se pudo abrir USB: '+e.message),'bad');await closePort()}finally{$('connect').disabled=false}};
+$('config').onsubmit=async e=>{e.preventDefault();if(!connected)return;say('Guardando por USB…');$('save').disabled=true;let data={deviceName:$('deviceName').value.trim(),artnetUniverse:+$('artnetUniverse').value,artnetChannel:+$('artnetChannel').value,relayPin:+$('relayPin').value,relayInverted:$('relayInverted').value==='true',wifiSsid:$('wifiSsid').value.trim(),wifiPassword:$('wifiPassword').value,staticIpEnabled:$('staticIpEnabled').checked,staticIp:$('staticIp').value.trim(),gateway:$('gateway').value.trim(),subnet:$('subnet').value.trim()};try{await send('ARCFG SET '+JSON.stringify(data))}catch(err){say('No se pudo guardar: '+err.message,'bad');$('save').disabled=false}};
+</script></body></html>
