@@ -1,6 +1,6 @@
 {
   "name": "ArtNet Devices",
-  "version": "2.0.7-usb-jtag-watchdog",
+  "version": "2.0.8-usb-jtag-boot-wait",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 20,
   "builds": [
