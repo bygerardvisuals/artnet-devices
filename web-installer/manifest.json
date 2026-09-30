@@ -1,12 +1,13 @@
 {
   "name": "Art-Net Relay",
-  "version": "1.0.9-usb-scan",
+  "version": "1.1.0-captive-improv",
   "new_install_prompt_erase": true,
+  "new_install_improv_wait_time": 20,
   "builds": [
     {
       "chipFamily": "ESP32-C6",
       "parts": [
-        { "path": "firmware/artnet-relay-esp32c6-supermini-usb-config-v9.bin", "offset": 0 }
+        { "path": "firmware/artnet-relay-esp32c6-supermini-captive-v11.bin", "offset": 0 }
       ]
     },
     {
