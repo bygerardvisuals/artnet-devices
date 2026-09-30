@@ -80,6 +80,10 @@ $('install').onclick = async () => {
     const response = await fetch(`firmware/${profile.file}?v=2.1.3-direct-flash`, { cache: 'no-store' });
     if (!response.ok) throw new Error('No se ha podido descargar el firmware correcto.');
     const firmware = new Uint8Array(await response.arrayBuffer());
+    // Some C3/C6 SuperMini clones expose a native USB-JTAG endpoint that
+    // stalls on the 16 KiB default stub packet.  A 4 KiB packet is slower
+    // only while flashing, but is reliable across those boards.
+    if (profile.nativeUsb) loader.FLASH_WRITE_SIZE = 0x1000;
     status(`Grabando ${profile.label} sin borrado completo…`);
     await loader.writeFlash({
       fileArray: [{ data: firmware, address: 0 }],
