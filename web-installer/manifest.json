@@ -1,6 +1,6 @@
 {
   "name": "ArtNet Devices",
-  "version": "2.1.0-c3-dio-safe",
+  "version": "2.1.1-usb-release",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 20,
   "builds": [
@@ -13,7 +13,7 @@
     {
       "chipFamily": "ESP32-C3",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32c3-supermini.bin?v=2.1.0-c3-dio-safe", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32c3-supermini.bin?v=2.1.1-usb-release", "offset": 0 }
       ]
     },
     {
