@@ -46,7 +46,9 @@ const profiles = [
   { match: /ESP32-S2/i, file: 'artnet-devices-esp32s2.bin', label: 'ESP32-S2 Saola-1' },
   { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 DevKitC-1' },
   { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini' },
-  { match: /^ESP32$/i, file: 'artnet-devices-esp32dev.bin', label: 'ESP32 DevKit / WROOM' }
+  // `loader.main()` reports detailed names such as ESP32-D0WD-V3, not just
+  // "ESP32".  Keep this last so the C2/C3/C6/S2/S3 profiles win first.
+  { match: /^ESP32(?:\b|-)/i, file: 'artnet-devices-esp32dev.bin', label: 'ESP32 DevKit / WROOM', flashSize: '4MB' }
 ];
 const terminal = {
   clean() { $('log').textContent = ''; },
@@ -87,17 +89,24 @@ $('install').onclick = async () => {
     status(`Grabando ${profile.label} sin borrado completo…`);
     await loader.writeFlash({
       fileArray: [{ data: firmware, address: 0 }],
-      flashMode: 'keep', flashFreq: 'keep', flashSize: 'detect',
+      // Some ESP8266 modules do not expose a JEDEC size byte although their
+      // 4 MiB flash is perfectly usable.  D1 mini and NodeMCU images target
+      // 4 MiB; fixing the value avoids a needless autodetection failure.
+      flashMode: 'keep', flashFreq: 'keep', flashSize: profile.flashSize || (profile.match.source.includes('ESP8266') ? '4MB' : 'detect'),
       eraseAll: false, compress: true,
       reportProgress: (_file, written, total) => { $('progress').value = Math.round(written * 100 / total); }
     });
     if (profile.nativeUsb) {
       await loader.after('no_reset');
-      status(`Firmware grabado en ${profile.label}. Pulsa RST una vez (sin BOOT); después abre Configurar por USB.`);
+      status(`Firmware grabado en ${profile.label}. Se abrirá Configurar por USB; pulsa RST una vez (sin BOOT) si aún no responde.`);
     } else {
       await loader.after('hard_reset');
-      status(`Firmware grabado en ${profile.label}. Ya puedes abrir Configurar por USB.`);
+      status(`Firmware grabado en ${profile.label}. Abriendo Configurar por USB…`);
     }
+    await release(transport); transport = undefined;
+    // The browser retains permission for the selected port, so the
+    // configurator can reconnect without another chooser or a Wi-Fi change.
+    setTimeout(() => { location.href = 'usb-configure.html?v=2.2.0-auto-open'; }, 350);
   } catch (error) {
     status(friendlyError(error), true);
     terminal.writeLine(`\nERROR: ${String(error?.stack || error)}`);
