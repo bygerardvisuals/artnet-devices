@@ -174,7 +174,19 @@ ledcAttach(o.pin,1000,8);
 String pinsJson(){String r="[";for(uint8_t i=0;i<BOARD_PIN_COUNT;i++){if(i)r+=',';const PinDef&p=BOARD_PINS[i];r+="{\"gpio\":"+String(p.gpio)+",\"pwm\":"+(p.pwm?"true":"false")+",\"reserved\":"+(p.gpio==STATUS_LED_PIN?"true":"false")+"}";}return r+"]";}
 String outputsJson(){String r="[";bool first=true;for(uint8_t i=0;i<MAX_OUTPUTS;i++){const OutputConfig&o=config.outputs[i];if(o.pin<0)continue;if(!first)r+=',';first=false;r+="{\"slot\":"+String(i)+",\"pin\":"+String(o.pin)+",\"channel\":"+String(o.channel)+",\"mode\":"+String(o.mode)+",\"inverted\":"+(o.inverted?"true":"false")+",\"threshold\":"+String(o.threshold)+",\"value\":"+String(outputValues[i])+"}";}return r+"]";}
 String configJson(){String ip=accessPointMode?WiFi.softAPIP().toString():WiFi.localIP().toString();return "{\"name\":\""+jsonEscape(config.name)+"\",\"deviceName\":\""+jsonEscape(config.name)+"\",\"board\":\""+String(DEVICE_PROFILE)+"\",\"universe\":"+String(config.universe)+",\"artnetUniverse\":"+String(config.universe)+",\"wifiSsid\":\""+jsonEscape(config.wifiSsid)+"\",\"staticIpEnabled\":"+(config.staticIpEnabled?"true":"false")+",\"staticIp\":\""+jsonEscape(config.staticIp)+"\",\"gateway\":\""+jsonEscape(config.gateway)+"\",\"subnet\":\""+jsonEscape(config.subnet)+"\",\"ip\":\""+ip+"\",\"ap\":"+(accessPointMode?"true":"false")+",\"statusLedPin\":"+String(STATUS_LED_PIN)+",\"statusLedInverted\":"+(STATUS_LED_INVERTED?"true":"false")+",\"safePinCount\":"+String(safePinCount())+",\"pins\":"+pinsJson()+",\"outputs\":"+outputsJson()+"}";}
-String wifiScanJson(){int n=WiFi.scanNetworks();String r="[";for(int i=0;i<n;i++){if(i)r+=',';r+='"';r+=jsonEscape(WiFi.SSID(i));r+='"';}WiFi.scanDelete();return r+"]";}
+String cachedWifiScanJson;
+bool wifiScanCached = false;
+String wifiScanJson(){
+  // Repeated scan/delete cycles can reset the C3/C6 Wi-Fi driver while a USB
+  // client is reading the result. Keep one copied, bounded scan per boot; a
+  // hidden network can always be entered in the SSID field.
+  if(wifiScanCached)return cachedWifiScanJson;
+  int n=WiFi.scanNetworks(false,true);
+  String r; r.reserve(640); r="[";
+  uint8_t added=0;
+  for(int i=0;i<n&&added<20;i++){String ssid=WiFi.SSID(i);if(!ssid.length())continue;if(added++)r+=',';r+='"';r+=jsonEscape(ssid.substring(0,32));r+='"';}
+  r+=']';cachedWifiScanJson=r;wifiScanCached=true;return cachedWifiScanJson;
+}
 
 String safeHostname(){String h=config.name;h.toLowerCase();for(size_t i=0;i<h.length();i++)if(!isAlphaNumeric(h[i]))h.setCharAt(i,'-');while(h.indexOf("--")>=0)h.replace("--","-");if(!h.length())h="artnet-devices";return h.substring(0,63);}
 void beginAp(){accessPointMode=true;WiFi.mode(WIFI_AP_STA);WiFi.softAP("ArtNet-Devices-Setup");captiveDns.start(53,"*",WiFi.softAPIP());}
