@@ -1,6 +1,11 @@
 #include <Arduino.h>
 #include <DNSServer.h>
-#include <Adafruit_NeoPixel.h>
+#ifndef PIXEL_OUTPUT_SUPPORTED
+  #define PIXEL_OUTPUT_SUPPORTED 1
+#endif
+#if PIXEL_OUTPUT_SUPPORTED
+  #include <Adafruit_NeoPixel.h>
+#endif
 #if defined(ESP8266)
   #include <ESP8266WiFi.h>
   #include <ESP8266WebServer.h>
@@ -126,10 +131,12 @@ uint8_t outputValues[MAX_OUTPUTS] = {};
 bool outputInitialized[MAX_OUTPUTS] = {};
 bool restartPending = false;
 uint32_t restartAt = 0;
-Adafruit_NeoPixel pixelStrip(MAX_PIXELS, DEFAULT_OUTPUT_PIN, NEO_GRB + NEO_KHZ800);
-uint8_t pixelData[MAX_PIXELS * 3] = {};
-bool pixelDirty = false;
-uint32_t lastPixelShowAt = 0;
+#if PIXEL_OUTPUT_SUPPORTED
+  Adafruit_NeoPixel pixelStrip(MAX_PIXELS, DEFAULT_OUTPUT_PIN, NEO_GRB + NEO_KHZ800);
+  uint8_t pixelData[MAX_PIXELS * 3] = {};
+  bool pixelDirty = false;
+  uint32_t lastPixelShowAt = 0;
+#endif
 
 const char INDEX_HTML[] PROGMEM = R"html(
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ArtNet Devices</title><style>
@@ -140,7 +147,7 @@ const char INDEX_HTML[] PROGMEM = R"html(
 <section id="ota" class="page"><div class="grid"><form class="card" id="update"><h2>Actualización OTA</h2><p class="note">Selecciona únicamente la imagen OTA <code>firmware.bin</code> de la misma familia de chip. No desconectes la alimentación durante el proceso.</p><input id="firmware" type="file" accept=".bin" required><button class="button primary">Instalar actualización</button><p id="updateMsg" class="muted"></p></form></div></section></main><script>
 const $=x=>document.getElementById(x);let state={},draft=[];document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button,.page').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.p).classList.add('on')});
 document.querySelector('#setup .grid').insertAdjacentHTML('beforeend',`<form class="card wide" id="pixelForm"><h2>Tira Pixel LED Art‑Net</h2><p class="muted">Una tira por GPIO: recibe RGB en hasta tres universos consecutivos. El pin no puede compartirse con un relé o PWM.</p><label><input id="pixelEnabled" type="checkbox" style="width:auto"> Activar tira direccionable</label><div class="row"><div><label>GPIO de datos</label><select id="pixelPin"></select></div><div><label>Orden físico</label><select id="pixelOrder"><option value="0">GRB (WS2812B habitual)</option><option value="1">RGB</option><option value="2">BRG</option></select></div><div><label>Universo inicial</label><input id="pixelStartUniverse" type="number" min="0" max="32767"></div><div><label>Número de píxeles</label><input id="pixelCount" type="number" min="1" max="512"></div></div><p class="note" id="pixelInfo">Cada universo transporta 512 canales DMX; RGB consume 3 canales por píxel.</p><button class="button primary">Guardar tira y reiniciar</button><p id="pixelMsg" class="muted"></p></form>`);
-function pixelFill(s){let p=s.pixels||{enabled:false,pin:-1,startUniverse:0,count:60,order:0,universes:1};let choices='<option value="-1">Seleccionar GPIO…</option>'+s.pins.filter(x=>!x.reserved).map(x=>`<option value="${x.gpio}">GPIO ${x.gpio}</option>`).join('');$('pixelPin').innerHTML=choices;$('pixelEnabled').checked=!!p.enabled;$('pixelPin').value=p.pin;$('pixelStartUniverse').value=p.startUniverse;$('pixelCount').value=p.count;$('pixelOrder').value=p.order;$('pixelInfo').textContent=`${p.count} píxeles RGB usan ${p.universes||Math.ceil(p.count*3/512)} universo(s): ${p.startUniverse}–${p.startUniverse+(p.universes||Math.ceil(p.count*3/512))-1}. Máximo: 512 píxeles / 3 universos por GPIO.`}
+function pixelFill(s){let p=s.pixels||{supported:false,enabled:false,pin:-1,startUniverse:0,count:60,order:0,universes:1},supported=p.supported!==false;let choices='<option value="-1">Seleccionar GPIO…</option>'+s.pins.filter(x=>!x.reserved).map(x=>`<option value="${x.gpio}">GPIO ${x.gpio}</option>`).join('');$('pixelPin').innerHTML=choices;$('pixelEnabled').checked=!!p.enabled;$('pixelPin').value=p.pin;$('pixelStartUniverse').value=p.startUniverse;$('pixelCount').value=p.count;$('pixelOrder').value=p.order;document.querySelectorAll('#pixelForm input,#pixelForm select,#pixelForm button').forEach(x=>x.disabled=!supported);$('pixelInfo').textContent=supported?`${p.count} píxeles RGB usan ${p.universes||Math.ceil(p.count*3/512)} universo(s): ${p.startUniverse}–${p.startUniverse+(p.universes||Math.ceil(p.count*3/512))-1}. Máximo: 512 píxeles / 3 universos por GPIO.`:'Esta familia no dispone de un controlador Pixel LED compatible; sigue siendo plenamente válida para GPIO digital y PWM.'}
 $('pixelForm').onsubmit=e=>{e.preventDefault();save({pixelEnabled:$('pixelEnabled').checked,pixelPin:+$('pixelPin').value,pixelStartUniverse:+$('pixelStartUniverse').value,pixelCount:+$('pixelCount').value,pixelOrder:+$('pixelOrder').value},'pixelMsg')};$('pixelCount').oninput=()=>{$('pixelInfo').textContent=`${$('pixelCount').value||0} píxeles RGB usan ${Math.ceil((+$('pixelCount').value||0)*3/512)} universo(s) desde el universo ${$('pixelStartUniverse').value||0}.`};
 const esc=s=>String(s).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function optionPins(selected){return '<option value="-1">Seleccionar GPIO…</option>'+state.pins.map(p=>`<option value="${p.gpio}" ${p.reserved?'disabled':''} ${p.gpio==selected?'selected':''}>GPIO ${p.gpio}${p.reserved?' — LED de placa (reservado)':p.pwm?' — PWM':' — digital'}</option>`).join('')}
@@ -158,6 +165,7 @@ bool pinSupportsPwm(int pin) { for (uint8_t i=0;i<BOARD_PIN_COUNT;i++) if (BOARD
 bool isAllowedOutput(int pin) { return pin != STATUS_LED_PIN && isKnownPin(pin); }
 uint8_t safePinCount() { uint8_t n=0; for(uint8_t i=0;i<BOARD_PIN_COUNT;i++) if(isAllowedOutput(BOARD_PINS[i].gpio)) n++; return n; }
 uint16_t pixelUniverseCount() { return (uint16_t)((config.pixels.count * 3UL + ARTNET_CHANNELS - 1) / ARTNET_CHANNELS); }
+#if PIXEL_OUTPUT_SUPPORTED
 neoPixelType pixelType() { return config.pixels.order == 1 ? NEO_RGB + NEO_KHZ800 : config.pixels.order == 2 ? NEO_BRG + NEO_KHZ800 : NEO_GRB + NEO_KHZ800; }
 bool validatePixels() {
   if (!config.pixels.enabled) return true;
@@ -194,6 +202,14 @@ void servicePixels() {
   pixelDirty = false;
   lastPixelShowAt = millis();
 }
+#else
+// ESP32-C2 has no supported timing backend for addressable LEDs in the
+// selected Arduino core. It remains a complete GPIO/PWM Art-Net node.
+bool validatePixels() { return !config.pixels.enabled; }
+void setupPixels() {}
+void applyPixelChunk(uint16_t, const uint8_t*, uint16_t) {}
+void servicePixels() {}
+#endif
 void clearOutputs() { for (uint8_t i=0;i<MAX_OUTPUTS;i++) config.outputs[i] = OutputConfig(); }
 void defaults() { clearOutputs(); config.pixels=PixelConfig(); config.name="ArtNet Devices"; config.universe=0; config.outputs[0].pin=DEFAULT_OUTPUT_PIN; config.outputs[0].channel=1; }
 
@@ -238,7 +254,7 @@ ledcAttach(o.pin,1000,8);
 
 String pinsJson(){String r="[";for(uint8_t i=0;i<BOARD_PIN_COUNT;i++){if(i)r+=',';const PinDef&p=BOARD_PINS[i];r+="{\"gpio\":"+String(p.gpio)+",\"pwm\":"+(p.pwm?"true":"false")+",\"reserved\":"+(p.gpio==STATUS_LED_PIN?"true":"false")+"}";}return r+"]";}
 String outputsJson(){String r="[";bool first=true;for(uint8_t i=0;i<MAX_OUTPUTS;i++){const OutputConfig&o=config.outputs[i];if(o.pin<0)continue;if(!first)r+=',';first=false;r+="{\"slot\":"+String(i)+",\"pin\":"+String(o.pin)+",\"channel\":"+String(o.channel)+",\"mode\":"+String(o.mode)+",\"inverted\":"+(o.inverted?"true":"false")+",\"threshold\":"+String(o.threshold)+",\"value\":"+String(outputValues[i])+"}";}return r+"]";}
-String pixelsJson(){return String("{\"enabled\":")+(config.pixels.enabled?"true":"false")+",\"pin\":"+String(config.pixels.pin)+",\"startUniverse\":"+String(config.pixels.startUniverse)+",\"count\":"+String(config.pixels.count)+",\"order\":"+String(config.pixels.order)+",\"universes\":"+String(pixelUniverseCount())+"}";}
+String pixelsJson(){return String("{\"supported\":")+(PIXEL_OUTPUT_SUPPORTED?"true":"false")+",\"enabled\":"+(config.pixels.enabled?"true":"false")+",\"pin\":"+String(config.pixels.pin)+",\"startUniverse\":"+String(config.pixels.startUniverse)+",\"count\":"+String(config.pixels.count)+",\"order\":"+String(config.pixels.order)+",\"universes\":"+String(pixelUniverseCount())+"}";}
 String configJson(){bool stationConnected=WiFi.status()==WL_CONNECTED;String ip=stationConnected?WiFi.localIP().toString():WiFi.softAPIP().toString();return "{\"name\":\""+jsonEscape(config.name)+"\",\"deviceName\":\""+jsonEscape(config.name)+"\",\"board\":\""+String(DEVICE_PROFILE)+"\",\"universe\":"+String(config.universe)+",\"artnetUniverse\":"+String(config.universe)+",\"wifiSsid\":\""+jsonEscape(config.wifiSsid)+"\",\"staticIpEnabled\":"+(config.staticIpEnabled?"true":"false")+",\"staticIp\":\""+jsonEscape(config.staticIp)+"\",\"gateway\":\""+jsonEscape(config.gateway)+"\",\"subnet\":\""+jsonEscape(config.subnet)+"\",\"ip\":\""+ip+"\",\"ap\":"+(accessPointMode?"true":"false")+",\"stationConnected\":"+(stationConnected?"true":"false")+",\"apIp\":\""+WiFi.softAPIP().toString()+"\",\"statusLedPin\":"+String(STATUS_LED_PIN)+",\"statusLedInverted\":"+(STATUS_LED_INVERTED?"true":"false")+",\"safePinCount\":"+String(safePinCount())+",\"pins\":"+pinsJson()+",\"outputs\":"+outputsJson()+",\"pixels\":"+pixelsJson()+"}";}
 String cachedWifiScanJson;
 bool wifiScanCached = false;

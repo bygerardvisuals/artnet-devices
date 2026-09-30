@@ -14,6 +14,10 @@ Cada salida se define independientemente con:
 
 La interfaz indica el LED integrado y lo reserva para visualizar actividad, por lo que no deja configurarlo accidentalmente como una salida. También excluye pines de flash, USB, UART, arranque o de entrada exclusiva. No todos los GPIO físicos de un chip están expuestos por todas las placas: el número mostrado es el de GPIO seguros del perfil de firmware instalado.
 
+## Pixel LED
+
+Las placas con temporización compatible ofrecen una salida Pixel LED direccionable: una tira RGB usa un GPIO reservado, de uno a tres universos Art-Net consecutivos y no puede compartir el pin con una salida digital o PWM. El ESP32-C2 se anuncia explícitamente como **GPIO/PWM solamente**: el núcleo Arduino actual no aporta un backend estable para Pixel LED en esa familia, por lo que el instalador no publica una imagen rota ni deja activar esa opción.
+
 ## Placas incluidas
 
 - ESP32-C6 SuperMini
@@ -32,7 +36,7 @@ Abre el instalador publicado en Chrome o Edge, conecta la placa por USB y pulsa 
 
 Si no hay una red guardada, la placa crea el punto de acceso `ArtNet-Devices-Setup`; el portal cautivo y [http://192.168.4.1](http://192.168.4.1) abren la configuración. El mismo configurador puede usarse por USB desde `web-installer/usb-configure.html`, sin desconectar el ordenador de su Wi-Fi.
 
-Desde el panel se configuran red, IP estática opcional, nombre Art-Net, universo y todas las salidas. El nombre aparece en las respuestas ArtPoll, para que MadMapper y otros controladores lo identifiquen. La pestaña Firmware acepta actualizaciones OTA usando la imagen OTA de la misma familia de chip.
+Desde el panel se configuran red, IP estática opcional, nombre Art-Net, universo, salidas y, cuando la placa lo permite, Pixel LED. El nombre aparece en las respuestas ArtPoll, para que MadMapper y otros controladores lo identifiquen. La pestaña Firmware acepta actualizaciones OTA usando la imagen OTA de la misma familia de chip.
 
 ## Desarrollo
 
