@@ -21,7 +21,7 @@
     <p><b>1.</b> Conecta el ESP32 por USB.</p>
     <p><b>2.</b> Pulsa instalar y selecciona el puerto serie correcto. Si no aparece, mantén pulsado <b>BOOT</b>, pulsa <b>RST</b> una vez y vuelve a intentarlo.</p>
     <p><b>3.</b> Al acabar, abre <b>Configurar por USB</b> desde esta misma página. Así eliges el universo y cada GPIO/canal, digital o PWM sin cambiar la red del ordenador.</p>
-    <esp-web-install-button manifest="manifest.json?v=2.0.2-wifi-scan-fix"><button slot="activate">Instalar en el ESP32</button><span slot="unsupported">Abre esta página en Chrome o Edge por HTTPS o desde <code>localhost</code>.</span></esp-web-install-button>
+    <esp-web-install-button manifest="manifest.json?v=2.0.3-usb-reconnect"><button slot="activate">Instalar en el ESP32</button><span slot="unsupported">Abre esta página en Chrome o Edge por HTTPS o desde <code>localhost</code>.</span></esp-web-install-button>
   </div>
   <div class="box">
     <b>Controladores USB</b>
@@ -29,7 +29,7 @@
     <p><b>CH340, CH341 o CH9102:</b> instala el controlador <a href="https://www.wch.cn/downloads/CH341SER_ZIP.html">WCH</a>. <b>CP210x:</b> instala el <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers">VCP de Silicon Labs</a>. Son habituales en ESP32 clásicos y ESP8266/Wemos; confirma el chip impreso en tu placa o el nombre del puerto.</p>
     <p><small>En Windows, macOS Intel, macOS Apple Silicon y Linux la web funciona con Chrome/Edge mediante Web Serial. La app de escritorio usa el puerto serie del sistema y no depende de Chrome.</small></p>
   </div>
-  <p><a href="usb-configure.html?v=2.0.2-wifi-scan-fix"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
+  <p><a href="usb-configure.html?v=2.0.3-usb-reconnect"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
   <p><small>Incluye búsqueda de redes, IP, universo, GPIO/canales y PWM sin desconectar el ordenador de Internet. El botón <i>Change Wi‑Fi</i> del cuadro de Espressif sólo admite SSID manual: usa este configurador para escanear.</small></p>
   <p><small><i>Visit Device</i> abre el portal de red. Para verlo en modo configuración debes unir el ordenador al Wi‑Fi <code>ArtNet-Devices-Setup</code>; después abre <code>http://192.168.4.1</code>. El portal cautivo se abrirá automáticamente en los sistemas compatibles.</small></p>
   <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>

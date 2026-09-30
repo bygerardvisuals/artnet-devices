@@ -1,6 +1,6 @@
 {
   "name": "ArtNet Devices",
-  "version": "2.0.2-wifi-scan-fix",
+  "version": "2.0.3-usb-reconnect",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 20,
   "builds": [
