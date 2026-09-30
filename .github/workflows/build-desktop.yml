@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install platformio
-      - run: pio run -e esp32c6-supermini -e esp32c3-supermini -e esp32dev -e wemos-d1-mini
+      - run: pio run -e esp32c6-supermini -e esp32c3-supermini -e esp32c2 -e esp32dev -e esp32s2 -e esp32s3 -e wemos-d1-mini
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-images

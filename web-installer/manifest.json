@@ -17,9 +17,27 @@
       ]
     },
     {
+      "chipFamily": "ESP32-C2",
+      "parts": [
+        { "path": "firmware/artnet-relay-esp32c2.bin", "offset": 0 }
+      ]
+    },
+    {
       "chipFamily": "ESP32",
       "parts": [
         { "path": "firmware/artnet-relay-esp32dev.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S2",
+      "parts": [
+        { "path": "firmware/artnet-relay-esp32s2.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "firmware/artnet-relay-esp32s3.bin", "offset": 0 }
       ]
     },
     {
