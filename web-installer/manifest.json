@@ -1,49 +1,49 @@
 {
   "name": "ArtNet Devices",
-  "version": "2.0.0-gpio-pwm",
+  "version": "2.0.1-usb-fix",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 20,
   "builds": [
     {
       "chipFamily": "ESP32-C6",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32c6-supermini.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32c6-supermini.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP32-C3",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32c3-supermini.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32c3-supermini.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP32-C2",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32c2.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32c2.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32dev.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32dev.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP32-S2",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32s2.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32s2.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP32-S3",
       "parts": [
-        { "path": "firmware/artnet-devices-esp32s3.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-esp32s3.bin?v=2.0.1", "offset": 0 }
       ]
     },
     {
       "chipFamily": "ESP8266",
       "parts": [
-        { "path": "firmware/artnet-devices-wemos-d1-mini.bin", "offset": 0 }
+        { "path": "firmware/artnet-devices-wemos-d1-mini.bin?v=2.0.1", "offset": 0 }
       ]
     }
   ]
