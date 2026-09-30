@@ -33,5 +33,5 @@
   <p><small>Incluye búsqueda de redes, IP, universo, GPIO/canales y PWM sin desconectar el ordenador de Internet. El botón <i>Change Wi‑Fi</i> del cuadro de Espressif sólo admite SSID manual: usa este configurador para escanear.</small></p>
   <p><small>El portal de red permanece siempre disponible: únete al Wi‑Fi <code>ArtNet-Devices-Setup</code> y abre <code>http://192.168.4.1</code>, incluso después de guardar otra red. Si el dispositivo está en tu Wi‑Fi habitual, también puedes usar su IP o su nombre <code>artnet-devices.local</code>. El portal cautivo se abrirá automáticamente en los sistemas compatibles.</small></p>
   <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>
-</main></body>
+</main><script>if(!location.search.includes('install')&&navigator.serial)navigator.serial.getPorts().then(p=>{if(p.length===1)location.replace('usb-configure.html?v=2.0.5-fast-usb')}).catch(()=>{});</script></body>
 </html>
