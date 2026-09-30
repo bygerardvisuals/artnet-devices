@@ -1,4 +1,4 @@
-# Art-Net Relay Desktop
+# ArtNet Devices Desktop
 
 Aplicación Electron para instalar y configurar el ESP32 en macOS, Windows y Linux.
 

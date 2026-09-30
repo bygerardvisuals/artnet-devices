@@ -13,8 +13,8 @@ def merge_for_web_installer(source, target, env):
     project = Path(env.subst("$PROJECT_DIR"))
     build = Path(env.subst("$BUILD_DIR"))
     environment = env.subst("$PIOENV")
-    destination = project / "web-installer" / "firmware" / f"artnet-relay-{environment}.bin"
-    ota_destination = project / "web-installer" / "firmware" / f"artnet-relay-{environment}-ota.bin"
+    destination = project / "web-installer" / "firmware" / f"artnet-devices-{environment}.bin"
+    ota_destination = project / "web-installer" / "firmware" / f"artnet-devices-{environment}-ota.bin"
     destination.parent.mkdir(parents=True, exist_ok=True)
     board = env.BoardConfig()
     mcu = board.get("build.mcu", "esp32")

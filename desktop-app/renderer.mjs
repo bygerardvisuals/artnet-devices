@@ -1,71 +1,31 @@
 import { ESPLoader, Transport } from './node_modules/esptool-js/bundle.js';
 
 const $ = (id) => document.getElementById(id);
-let base = '';
+let base = '', device = {}, outputs = [];
 const terminal = { clean: () => { $('terminal').textContent = ''; }, write: (text) => { $('terminal').textContent += text; }, writeLine: (text) => { $('terminal').textContent += `${text}\n`; } };
 const boards = {
   'esp32c6-supermini': { label: 'ESP32-C6 SuperMini', chip: 'ESP32-C6' },
   'esp32c3-supermini': { label: 'ESP32-C3 SuperMini', chip: 'ESP32-C3' },
+  esp32c2: { label: 'ESP32-C2 DevKitM-1', chip: 'ESP32-C2' },
   esp32dev: { label: 'ESP32 clásico', chip: 'ESP32' },
+  esp32s2: { label: 'ESP32-S2 Saola-1', chip: 'ESP32-S2' },
+  esp32s3: { label: 'ESP32-S3 DevKitC-1', chip: 'ESP32-S3' },
   'wemos-d1-mini': { label: 'ESP8266 / Wemos D1 mini / NodeMCU', chip: 'ESP8266' }
 };
 
-document.querySelectorAll('[data-tab]').forEach((button) => button.onclick = () => {
-  document.querySelectorAll('[data-tab],.tab').forEach((item) => item.classList.remove('active'));
-  button.classList.add('active'); $(button.dataset.tab).classList.add('active');
-});
-
-async function refreshPorts() {
-  const ports = await window.relayDesktop.listPorts();
-  const select = $('ports');
-  select.replaceChildren();
-  if (!ports.length) {
-    const option = document.createElement('option'); option.value = ''; option.textContent = 'No se han detectado puertos'; select.append(option);
-  } else {
-    ports.forEach((port) => {
-      const option = document.createElement('option'); option.value = port.portId;
-      option.textContent = `${port.displayName || port.portName} ${port.vendorId ? `(${port.vendorId}:${port.productId || '?'})` : ''}`;
-      select.append(option);
-    });
-  }
-  $('flashStatus').textContent = ports.length ? 'Selecciona el ESP32 y pulsa «Instalar firmware».' : 'No se han detectado puertos. Conecta el ESP32 y revisa el cable USB.';
-}
+document.querySelectorAll('[data-tab]').forEach((button) => button.onclick = () => { document.querySelectorAll('[data-tab],.tab').forEach((item) => item.classList.remove('active')); button.classList.add('active'); $(button.dataset.tab).classList.add('active'); });
+async function refreshPorts() { const ports = await window.relayDesktop.listPorts(); const select = $('ports'); select.replaceChildren(); if (!ports.length) select.append(new Option('No se han detectado puertos', '')); else ports.forEach((port) => select.append(new Option(`${port.displayName || port.portName} ${port.vendorId ? `(${port.vendorId}:${port.productId || '?'})` : ''}`, port.portId))); $('flashStatus').textContent = ports.length ? 'Selecciona el ESP y pulsa «Instalar firmware».' : 'No se han detectado puertos. Revisa el cable USB.'; }
 $('refresh').onclick = refreshPorts;
+$('flash').onclick = async () => { const portId = $('ports').value, board = boards[$('board').value]; if (!portId) return refreshPorts(); $('flash').disabled = true; $('progress').value = 0; terminal.clean(); try { await window.relayDesktop.selectPort(portId); const port = await navigator.serial.requestPort(); const transport = new Transport(port); const loader = new ESPLoader({ transport, baudrate: 115200, terminal }); const chip = await loader.main(); if (!String(chip).includes(board.chip)) throw new Error(`Has elegido ${board.label}, pero se detectó ${chip}.`); const firmware = new Uint8Array(await window.relayDesktop.firmware($('board').value)); $('flashStatus').textContent = 'Grabando firmware…'; await loader.writeFlash({ fileArray: [{ data: firmware, address: 0 }], flashSize: '4MB', flashMode: 'dio', flashFreq: '40m', eraseAll: true, compress: true, reportProgress: (_index, written, total) => { $('progress').value = Math.round(written / total * 100); } }); await loader.after('hard_reset'); await transport.disconnect(); $('flashStatus').textContent = 'Instalación terminada. Abre «Configurar dispositivo» o visita 192.168.4.1.'; } catch (error) { $('flashStatus').textContent = `Error: ${error.message || error}`; } finally { $('flash').disabled = false; } };
 
-$('flash').onclick = async () => {
-  const portId = $('ports').value;
-  const board = boards[$('board').value];
-  if (!portId) return refreshPorts();
-  $('flash').disabled = true; $('progress').value = 0; terminal.clean();
-  try {
-    await window.relayDesktop.selectPort(portId);
-    $('flashStatus').textContent = 'Conectando con el ESP32…';
-    const port = await navigator.serial.requestPort();
-    const transport = new Transport(port);
-    const loader = new ESPLoader({ transport, baudrate: 115200, terminal });
-    const chip = await loader.main();
-    if (!String(chip).includes(board.chip)) throw new Error(`Has elegido ${board.label}, pero se detectó ${chip}.`);
-    const firmware = new Uint8Array(await window.relayDesktop.firmware($('board').value));
-    $('flashStatus').textContent = 'Grabando firmware…';
-    await loader.writeFlash({ fileArray: [{ data: firmware, address: 0 }], flashSize: '4MB', flashMode: 'dio', flashFreq: '40m', eraseAll: true, compress: true, reportProgress: (_index, written, total) => { $('progress').value = Math.round(written / total * 100); } });
-    await loader.after('hard_reset');
-    await transport.disconnect();
-    $('flashStatus').textContent = 'Instalación terminada. Abre la pestaña «Configurar dispositivo».';
-  } catch (error) { $('flashStatus').textContent = `Error: ${error.message || error}`; }
-  finally { $('flash').disabled = false; }
-};
-
+function pinOptions(selected) { return '<option value="-1">Seleccionar GPIO…</option>' + device.pins.map((p) => `<option value="${p.gpio}" ${p.reserved ? 'disabled' : ''} ${p.gpio == selected ? 'selected' : ''}>GPIO ${p.gpio}${p.reserved ? ' · LED reservado' : p.pwm ? ' · PWM' : ' · digital'}</option>`).join(''); }
+function renderOutputs() { const root = $('outputs'); root.innerHTML = outputs.map((o, i) => `<article class="output"><div class="outhead"><b>Salida ${i + 1}</b><button type="button" class="remove" data-remove="${i}">Quitar</button></div><div class="two"><label>GPIO<select data-i="${i}" data-k="pin">${pinOptions(o.pin)}</select></label><label>Canal DMX<input data-i="${i}" data-k="channel" type="number" min="1" max="512" value="${o.channel || 1}"></label><label>Tipo<select data-i="${i}" data-k="mode"><option value="0" ${+o.mode === 0 ? 'selected' : ''}>Digital ON/OFF</option><option value="1" ${+o.mode === 1 ? 'selected' : ''}>PWM dimmer</option></select></label><label>Invertir polaridad<select data-i="${i}" data-k="inverted"><option value="false" ${!o.inverted ? 'selected' : ''}>No</option><option value="true" ${o.inverted ? 'selected' : ''}>Sí</option></select></label><label>Umbral digital<input data-i="${i}" data-k="threshold" type="number" min="0" max="255" value="${o.threshold ?? 128}"></label></div></article>`).join('') || '<p>No hay salidas configuradas.</p>';
+  root.querySelectorAll('[data-remove]').forEach((button) => button.onclick = () => { outputs.splice(+button.dataset.remove, 1); renderOutputs(); });
+  root.querySelectorAll('[data-k]').forEach((field) => field.onchange = () => { const key = field.dataset.k; outputs[+field.dataset.i][key] = key === 'inverted' ? field.value === 'true' : +field.value; if (key === 'pin') { const pin = device.pins.find((item) => item.gpio === +field.value); if (pin && !pin.pwm) outputs[+field.dataset.i].mode = 0; } });
+}
 function host(value) { return value.trim().replace(/\/$/, ''); }
-$('connect').onclick = async () => {
-  base = host($('host').value); $('connection').textContent = 'Conectando…';
-  try {
-    const response = await fetch(`${base}/api/status`); if (!response.ok) throw new Error();
-    const config = await response.json();
-    $('deviceTitle').textContent = `Configuración · ${config.name}`; $('deviceName').value = config.name; $('wifiSsid').value = config.ssid === 'ArtNet-Relay-Setup' ? '' : config.ssid; $('artnetUniverse').value = config.universe; $('artnetChannel').value = config.channel; $('relayPin').value = config.relayPin; $('relayInverted').value = String(config.relayInverted); $('settings').classList.remove('hidden'); $('connection').textContent = `Conectado a ${config.ip}`;
-  } catch { $('settings').classList.add('hidden'); $('connection').textContent = 'No se ha encontrado el ESP32. Comprueba el Wi‑Fi y la dirección.'; }
-};
-$('settings').onsubmit = async (event) => {
-  event.preventDefault(); $('saveStatus').textContent = 'Guardando…';
-  try { const response = await fetch(`${base}/api/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.target))) }); $('saveStatus').textContent = response.ok ? 'Guardado. El ESP32 se está reiniciando.' : 'No se pudo guardar.'; } catch { $('saveStatus').textContent = 'Se perdió conexión; el ESP32 puede estar reiniciándose.'; }
-};
+$('connect').onclick = async () => { base = host($('host').value); $('connection').textContent = 'Conectando…'; try { const response = await fetch(`${base}/api/status`); if (!response.ok) throw new Error(); device = await response.json(); outputs = (device.outputs || []).map((o) => ({ ...o })); $('deviceTitle').textContent = `Configuración · ${device.board}`; $('deviceName').value = device.name; $('artnetUniverse').value = device.universe; $('wifiSsid').value = device.wifiSsid || ''; $('staticIpEnabled').checked = !!device.staticIpEnabled; $('staticIp').value = device.staticIp || ''; $('gateway').value = device.gateway || ''; $('subnet').value = device.subnet || '255.255.255.0'; $('ipFields').classList.toggle('hidden', !device.staticIpEnabled); $('pinInfo').textContent = `${device.safePinCount} GPIO seguros · LED de placa GPIO ${device.statusLedPin}${device.statusLedInverted ? ' (activo bajo)' : ''}.`; $('settings').classList.remove('hidden'); $('connection').textContent = `Conectado a ${device.ip}`; renderOutputs(); } catch { $('settings').classList.add('hidden'); $('connection').textContent = 'No se ha encontrado el dispositivo. Comprueba la red y la dirección.'; } };
+$('staticIpEnabled').onchange = (event) => $('ipFields').classList.toggle('hidden', !event.target.checked);
+$('addOutput').onclick = () => { if (outputs.length < 24) { outputs.push({ pin: -1, channel: 1, mode: 0, inverted: false, threshold: 128 }); renderOutputs(); } };
+$('settings').onsubmit = async (event) => { event.preventDefault(); $('saveStatus').textContent = 'Guardando…'; try { const response = await fetch(`${base}/api/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceName: $('deviceName').value, artnetUniverse: +$('artnetUniverse').value, wifiSsid: $('wifiSsid').value, wifiPassword: $('wifiPassword').value, staticIpEnabled: $('staticIpEnabled').checked, staticIp: $('staticIp').value, gateway: $('gateway').value, subnet: $('subnet').value, outputs }) }); $('saveStatus').textContent = response.ok ? 'Guardado. El dispositivo se está reiniciando.' : 'No se pudo guardar: revisa GPIO y canales.'; } catch { $('saveStatus').textContent = 'Se perdió conexión; el dispositivo puede estar reiniciándose.'; } };
 refreshPorts();

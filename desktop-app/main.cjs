@@ -5,7 +5,7 @@ const path = require('node:path');
 let selectedPorts = new Map();
 
 function firmwarePath(target) {
-  const file = `artnet-relay-${target}.bin`;
+  const file = `artnet-devices-${target}.bin`;
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app.asar', 'firmware', file)
     : path.join(__dirname, 'firmware', file);
@@ -17,7 +17,7 @@ function createWindow() {
     height: 760,
     minWidth: 760,
     minHeight: 600,
-    title: 'Art-Net Relay',
+    title: 'ArtNet Devices',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

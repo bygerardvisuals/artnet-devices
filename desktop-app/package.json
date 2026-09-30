@@ -1,8 +1,8 @@
 {
-  "name": "artnet-relay-desktop",
-  "productName": "Art-Net Relay",
+  "name": "artnet-devices-desktop",
+  "productName": "ArtNet Devices",
   "version": "1.0.0",
-  "description": "Instalador y configurador de escritorio para ESP32 Art-Net Relay",
+  "description": "Instalador y configurador de escritorio para ArtNet Devices",
   "homepage": "https://github.com/bygerardvisuals/artnet-relay-esp32c6",
   "author": {
     "name": "bygerardvisuals",
@@ -25,7 +25,7 @@
     "electron-builder": "^26.0.19"
   },
   "build": {
-    "appId": "com.artnetrelay.desktop",
+    "appId": "com.artnetdevices.desktop",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
     "files": [

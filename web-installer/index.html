@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Instalador Art-Net Relay</title>
+  <title>Instalador ArtNet Devices</title>
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
     :root { color-scheme: dark; --orange:#ff9f1c; --panel:#1d2430; --line:#344052; }
@@ -15,16 +15,16 @@
 </head>
 <body><main>
   <div class="logo">A</div>
-  <h1>Art‑Net Relay</h1>
-  <p>Graba el firmware directamente desde Google Chrome, sin instalar una herramienta de flasheo.</p>
+  <h1>ArtNet Devices</h1>
+  <p>Graba el firmware directamente desde Google Chrome y convierte la placa en un nodo Art‑Net de GPIO digitales y PWM.</p>
   <div class="box">
     <p><b>1.</b> Conecta el ESP32 por USB.</p>
     <p><b>2.</b> Pulsa instalar y selecciona el puerto serie correcto. Si no aparece, mantén pulsado <b>BOOT</b>, pulsa <b>RST</b> una vez y vuelve a intentarlo.</p>
-    <p><b>3.</b> Al acabar, abre el configurador USB y ajusta Wi‑Fi, IP, Art‑Net, relé y pines sin cambiar de red.</p>
-    <esp-web-install-button manifest="manifest.json?v=1.1.0-captive-improv"><button slot="activate">Instalar en el ESP32</button><span slot="unsupported">Abre esta página en Chrome o Edge por HTTPS o desde <code>localhost</code>.</span></esp-web-install-button>
+    <p><b>3.</b> Al acabar, Chrome ofrecerá visitar el dispositivo. Desde ahí eliges el universo y cada GPIO/canal, digital o PWM.</p>
+    <esp-web-install-button manifest="manifest.json?v=2.0.0-gpio-pwm"><button slot="activate">Instalar en el ESP32</button><span slot="unsupported">Abre esta página en Chrome o Edge por HTTPS o desde <code>localhost</code>.</span></esp-web-install-button>
   </div>
-  <p><a href="usb-configure.html?v=1.0.10-usb-release">Ya está instalado: configurar por USB en Chrome →</a></p>
-  <p><small>También puedes usar <a href="configure.html">el panel por red</a> cuando el relay ya esté conectado a Wi‑Fi.</small></p>
-  <small>Detecta automáticamente ESP32‑C6 SuperMini, ESP32‑C3 SuperMini, ESP32 clásico y ESP8266/Wemos D1 mini. Tras una instalación correcta, el diálogo ofrece configurar Wi‑Fi o visitar el panel del dispositivo.</small>
+  <p><a href="usb-configure.html?v=2.0.0-gpio-pwm">Ya está instalado: configurar por USB en Chrome →</a></p>
+  <p><small>También puedes usar <a href="configure.html">el panel por red</a> cuando el dispositivo ya esté conectado a Wi‑Fi.</small></p>
+  <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>
 </main></body>
 </html>

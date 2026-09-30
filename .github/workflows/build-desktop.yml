@@ -23,7 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-images
-          path: web-installer/firmware/artnet-relay-*.bin
+          path: web-installer/firmware/artnet-devices-*.bin
           if-no-files-found: error
   package:
     name: ${{ matrix.name }}
@@ -59,6 +59,6 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
-          name: Art-Net-Relay-${{ matrix.name }}
+          name: ArtNet-Devices-${{ matrix.name }}
           path: desktop-app/dist/*
           if-no-files-found: error
