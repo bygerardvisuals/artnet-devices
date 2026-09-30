@@ -12,13 +12,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
   group: firmware-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-publish:
@@ -30,13 +30,6 @@ jobs:
           python-version: '3.12'
       - run: pip install platformio
       - run: pio run -e esp32c6-supermini -e esp32c3-supermini -e esp32c2 -e esp32dev -e esp32s2 -e esp32s3 -e wemos-d1-mini -e nodemcuv2
-      - name: Save generated firmware in the repository
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add web-installer/firmware
-          git diff --cached --quiet || git commit -m "Build firmware images"
-          git push
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
