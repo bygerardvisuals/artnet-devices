@@ -19,7 +19,7 @@
   <div class="box">
     <p><b>1.</b> Conecta el ESP32 por USB.</p>
     <p><b>2.</b> Pulsa instalar y selecciona el puerto serie correcto. El instalador identifica el chip antes de elegir el firmware: no tienes que seleccionar ningún modelo.</p>
-    <p><b>3.</b> Al acabar, abre <b>Configurar por USB</b> desde esta misma página. Así eliges el universo y cada GPIO/canal, digital o PWM sin cambiar la red del ordenador.</p>
+  <p><b>3.</b> Al acabar se abrirá <b>Configurar por USB</b> automáticamente. Así eliges el universo y cada GPIO/canal, digital o PWM sin cambiar la red del ordenador.</p>
     <button id="install">Instalar en el ESP32</button>
     <progress id="progress" max="100" value="0" hidden></progress>
     <p id="installStatus" role="status"><small>Usa Chrome o Edge. El C3/C6 USB‑JTAG no necesita drivers si el puerto aparece.</small></p>
@@ -31,7 +31,7 @@
     <p><b>CH340, CH341 o CH9102:</b> instala el controlador <a href="https://www.wch.cn/downloads/CH341SER_ZIP.html">WCH</a>. <b>CP210x:</b> instala el <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers">VCP de Silicon Labs</a>. Son habituales en ESP32 clásicos y ESP8266/Wemos; confirma el chip impreso en tu placa o el nombre del puerto.</p>
     <p><small>En Windows, macOS Intel, macOS Apple Silicon y Linux la web funciona con Chrome/Edge mediante Web Serial. La app de escritorio usa el puerto serie del sistema y no depende de Chrome.</small></p>
   </div>
-  <p><a href="usb-configure.html?v=2.1.3-direct-flash"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
+  <p><a href="usb-configure.html?v=2.2.0-auto-open"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
   <p><small>Incluye búsqueda de redes, IP, universo, GPIO/canales y PWM sin desconectar el ordenador de Internet. El botón <i>Change Wi‑Fi</i> del cuadro de Espressif sólo admite SSID manual: usa este configurador para escanear.</small></p>
   <p><small>El portal de red permanece siempre disponible: únete al Wi‑Fi <code>ArtNet-Devices-Setup</code> y abre <code>http://192.168.4.1</code>, incluso después de guardar otra red. Si el dispositivo está en tu Wi‑Fi habitual, también puedes usar su IP o su nombre <code>artnet-devices.local</code>. El portal cautivo se abrirá automáticamente en los sistemas compatibles.</small></p>
   <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>
@@ -60,6 +60,7 @@ function status(message, error = false) {
 }
 function friendlyError(error) {
   const message = String(error?.message || error);
+  if (/No port selected/i.test(message)) return 'No hay un puerto serie disponible. Conecta la placa, comprueba el cable de datos y, si usa CH340/CH9102 o CP210x, instala su driver.';
   if (/Failed to connect|sync/i.test(message)) return 'No se ha podido entrar en el bootloader. En C3/C6, pulsa BOOT, pulsa RST una vez, suelta BOOT y vuelve a instalar.';
   if (/NotFound|disconnected|NetworkError/i.test(message)) return 'El puerto USB se ha desconectado durante la instalación. Comprueba el cable y vuelve a intentarlo.';
   return `Instalación detenida: ${message}`;
