@@ -3,7 +3,7 @@
   "productName": "ArtNet Devices",
   "version": "1.0.0",
   "description": "Instalador y configurador de escritorio para ArtNet Devices",
-  "homepage": "https://github.com/bygerardvisuals/artnet-relay-esp32c6",
+  "homepage": "https://github.com/bygerardvisuals/artnet-devices",
   "author": {
     "name": "bygerardvisuals",
     "email": "bygerardvisuals@users.noreply.github.com"
