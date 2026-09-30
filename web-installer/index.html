@@ -45,7 +45,7 @@ const profiles = [
   { match: /ESP32-C2/i, file: 'artnet-devices-esp32c2.bin', label: 'ESP32-C2 DevKitM-1' },
   { match: /ESP32-S2/i, file: 'artnet-devices-esp32s2.bin', label: 'ESP32-S2 Saola-1' },
   { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 DevKitC-1' },
-  { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini' },
+  { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini / NodeMCU', flashSize: '4MB' },
   // `loader.main()` reports detailed names such as ESP32-D0WD-V3, not just
   // "ESP32".  Keep this last so the C2/C3/C6/S2/S3 profiles win first.
   { match: /^ESP32(?:\b|-)/i, file: 'artnet-devices-esp32dev.bin', label: 'ESP32 DevKit / WROOM', flashSize: '4MB' }
@@ -93,7 +93,7 @@ $('install').onclick = async () => {
       // Some ESP8266 modules do not expose a JEDEC size byte although their
       // 4 MiB flash is perfectly usable.  D1 mini and NodeMCU images target
       // 4 MiB; fixing the value avoids a needless autodetection failure.
-      flashMode: 'keep', flashFreq: 'keep', flashSize: profile.flashSize || (profile.match.source.includes('ESP8266') ? '4MB' : 'detect'),
+      flashMode: 'keep', flashFreq: 'keep', flashSize: profile.flashSize || 'detect',
       eraseAll: false, compress: true,
       reportProgress: (_file, written, total) => { $('progress').value = Math.round(written * 100 / total); }
     });
