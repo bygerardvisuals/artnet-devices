@@ -1,6 +1,6 @@
 {
   "name": "ArtNet Devices",
-  "version": "2.0.5-fast-usb",
+  "version": "2.0.6-usb-jtag-reopen",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 20,
   "builds": [
