@@ -48,10 +48,11 @@ const profiles = [
   // like the C3/C6.  Do not toggle the legacy UART reset lines after writing
   // it: that can leave this family in the ROM downloader instead of the app.
   { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 SuperMini', nativeUsb: true },
-  // ESP8266 images produced by Arduino already contain the boot header.  Do
-  // not ask esptool-js to probe the flash chip: some CH340/CP210x boards
-  // return only the manufacturer byte and that probe aborts before flashing.
-  { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini / NodeMCU', flashSize: 'keep', flashMode: 'dio', flashFreq: '40m' },
+  // ESP8266 images produced by Arduino already contain the boot header.  A
+  // Wemos/NodeMCU factory image targets 4 MB; forcing this prevents the
+  // incomplete JEDEC reply seen on common CH340/CP210x modules.  Unlike the
+  // ESP32 families, retain the proven sector-only erase path for ESP8266.
+  { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini / NodeMCU', flashSize: '4MB', eraseAll: false, uartAppReset: true },
   // `loader.main()` reports detailed names such as ESP32-D0WD-V3, not just
   // "ESP32".  Keep this last so the C2/C3/C6/S2/S3 profiles win first.
   { match: /^ESP32(?:\b|-)/i, file: 'artnet-devices-esp32dev.bin', label: 'ESP32 DevKit / WROOM', flashSize: '4MB' }
@@ -97,13 +98,14 @@ $('install').onclick = async () => {
     // after navigation instead of guessing when Chrome has old permissions
     // for more than one board.
     sessionStorage.setItem('artnet-devices-port', JSON.stringify(port.getInfo()));
-    status(`Grabando ${profile.label} con instalación limpia…`);
+    status(`Grabando ${profile.label}${profile.eraseAll === false ? ' con el método de flash ESP8266…' : ' con instalación limpia…'}`);
     await loader.writeFlash({
       fileArray: [{ data: firmware, address: 0 }],
       flashMode: profile.flashMode || 'keep', flashFreq: profile.flashFreq || 'keep', flashSize: profile.flashSize || 'detect',
-      // Starting from a known empty flash prevents obsolete partitions and
-      // preferences from a previous firmware affecting a new installation.
-      eraseAll: true, compress: true,
+      // ESP8266 uses its established sector erase path. Its factory image
+      // carries the boot header and partition layout already, while a full
+      // chip erase is unreliable on modules with incomplete JEDEC responses.
+      eraseAll: profile.eraseAll ?? true, compress: true,
       reportProgress: (_file, written, total) => { $('progress').value = Math.round(written * 100 / total); }
     });
     // Always leave the ROM downloader and boot the application ourselves.
@@ -116,6 +118,10 @@ $('install').onclick = async () => {
       // endpoint to the automatic configurator. This avoids any BOOT/RST
       // action by the user and does not touch Chrome from a live reader.
       if (profile.nativeUsb) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
+      // On an ESP8266 the generic esptool-js hard reset only deasserts RTS.
+      // CP2102/CH340 NodeMCU reset wiring needs EN pulsed while GPIO0 stays
+      // high; otherwise Chrome reconnects to the flashing stub, not the app.
+      else if (profile.uartAppReset) await loader.after('custom_reset', undefined, 'D0|R1|W100|D0|R0|W100');
       else await loader.after('hard_reset');
     } catch (resetError) {
       // Navigation must still continue: some USB-Serial/JTAG adapters do not
@@ -128,7 +134,7 @@ $('install').onclick = async () => {
     // Native USB may re-enumerate for a moment.  The destination retries the
     // remembered port until the running firmware replies, without a button,
     // BOOT or RST action from the user.
-    setTimeout(() => { location.href = 'usb-configure.html?v=2.3.0-auto-handoff'; }, profile.nativeUsb ? 1100 : 500);
+    setTimeout(() => { location.href = 'usb-configure.html?v=2.3.1-safe-port-handoff'; }, profile.nativeUsb ? 1100 : 500);
   } catch (error) {
     status(friendlyError(error), true);
     terminal.writeLine(`\nERROR: ${String(error?.stack || error)}`);
