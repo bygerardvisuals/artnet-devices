@@ -110,7 +110,13 @@ $('install').onclick = async () => {
     // This is also necessary on native-USB S3 boards: the configurator must
     // never attach to the downloader endpoint and wait for a manual reset.
     try {
-      await loader.after('hard_reset');
+      // `hard_reset` only lowers RTS and does not reset the USB Serial/JTAG
+      // peripheral on C3/C6/S3. Use Espressif's native JTAG reset sequence
+      // while the flashing transport still owns the port, then hand the same
+      // endpoint to the automatic configurator. This avoids any BOOT/RST
+      // action by the user and does not touch Chrome from a live reader.
+      if (profile.nativeUsb) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
+      else await loader.after('hard_reset');
     } catch (resetError) {
       // Navigation must still continue: some USB-Serial/JTAG adapters do not
       // expose reset lines, but the port can reconnect once their firmware

@@ -47,7 +47,16 @@ async function requestProfile(){
 function requestProfileAfterBoot(){clearTimeout(profileTimer);profileAttempts=0;profileWritePending=false;profileLoaded=false;say('USB conectado. Esperando el arranque del firmware…');profileTimer=setTimeout(requestProfile,900);}
 async function closeUsb(message='USB desconectado. Ya puedes conectar otra placa y pulsar Conectar por USB.'){clearTimeout(profileTimer);clearTimeout(restartTimer);clearTimeout(reconnectTimer);reconnectUntil=0;profileWritePending=false;profileLoaded=false;connected=false;const activeReader=reader,activeWriter=writer,activePort=port;reader=null;writer=null;port=null;buf='';try{activeReader?.cancel().catch(()=>{})}catch{}try{activeReader?.releaseLock()}catch{}try{activeWriter?.releaseLock()}catch{}try{if(activePort)await within(activePort.close(),800,'Cierre USB pendiente')}catch{}$('connect').textContent='Conectar por USB';$('settings').classList.add('hidden');say(message)}
 function driverHint(info){let id=info.usbVendorId;if(id===0x303a)return 'USB nativo Espressif detectado: C3/C6/S3 no requieren driver adicional en macOS, Linux ni Windows moderno.';if(id===0x10c4)return 'Adaptador Silicon Labs CP210x detectado: instala el controlador CP210x de Silicon Labs si el puerto no aparece.';if(id===0x1a86)return 'Adaptador WCH CH340/CH341/CH9102 detectado: instala el controlador WCH si el puerto no aparece.';return 'Si el puerto no aparece en este equipo: las placas C3/C6/S3 por USB nativo usan CDC del sistema; otras ESP32/ESP8266 pueden llevar CH340/CH341/CH9102 (WCH) o CP210x (Silicon Labs).'}
-async function openConfiguredPort(candidate){port=candidate;await port.open({baudRate:115200});writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar';read()}
+async function openConfiguredPort(candidate){
+  port=candidate;
+  await port.open({baudRate:115200});
+  // Web Serial leaves modem-control signals unspecified.  Native ESP USB
+  // CDC/JTAG interfaces can report an open endpoint before the host has
+  // asserted DTR, so explicitly assert it before asking the firmware for its
+  // profile.  UART bridges ignore this harmlessly; it does not reset the ESP.
+  try{await port.setSignals({dataTerminalReady:true,requestToSend:true})}catch{}
+  writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar';read()
+}
 async function reconnectNativeUsb(){
   clearTimeout(reconnectTimer);
   if(Date.now()>reconnectUntil){await closeUsb('USB desconectado. Ya puedes conectar otra placa y pulsar Conectar por USB.');return}
