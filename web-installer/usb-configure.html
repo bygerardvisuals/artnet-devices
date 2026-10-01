@@ -20,7 +20,19 @@ function line(s){
     return;
   }
   if(!s.startsWith('ARCFG '))return;let p=s.slice(6);try{if(p[0]==='{')fill(JSON.parse(p));else if(p[0]==='['){let a=JSON.parse(p);$('networks').innerHTML='<option value="">Seleccionar red…</option>'+a.map(x=>'<option>'+x+'</option>').join('');say('Redes detectadas.','ok')}else if(p==='OK'){if(pendingSave)$('saveStatus').textContent='Guardado. Verificando reinicio…';say('Guardado. Reconectando automáticamente tras el reinicio…','ok');retryAfterRestart()}}catch{say('El escaneo devolvió una respuesta incompleta; el puerto sigue conectado. Puedes volver a pulsar Buscar.','bad')}}
-async function read(){let d=new TextDecoder();try{while(port?.readable){reader=port.readable.getReader();try{while(true){let {value,done}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});let lines=buf.split(/\r?\n/);buf=lines.pop();lines.forEach(line)}}finally{reader.releaseLock();reader=null}}}catch(e){if(connected){say('El dispositivo está reiniciándose. Se reconectará automáticamente…','');retryAfterRestart()}}}
+async function read(){
+  // Acquire a reader once per open port.  Some ESP ROM downloaders close a
+  // readable stream immediately while keeping the Web Serial port object
+  // alive; the former nested loop re-acquired that closed stream forever and
+  // could freeze Chrome.  Returning on `done` leaves the UI responsive and
+  // lets the normal reconnect path handle a real USB re-enumeration.
+  const activePort=port,activeReader=activePort?.readable?.getReader();
+  if(!activeReader)return;
+  reader=activeReader;const d=new TextDecoder();
+  try{while(connected&&port===activePort){let {value,done}=await activeReader.read();if(done)break;buf+=d.decode(value,{stream:true});let lines=buf.split(/\r?\n/);buf=lines.pop();lines.forEach(line)}}
+  catch(e){if(connected&&port===activePort){say('El dispositivo está reiniciándose. Se reconectará automáticamente…','');retryAfterRestart()}}
+  finally{try{activeReader.releaseLock()}catch{}if(reader===activeReader)reader=null}
+}
 function within(p,ms,message){let timer;return Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms)})]).finally(()=>clearTimeout(timer))}
 async function send(s){if(!writer)throw new Error('Puerto no disponible');await within(writer.write(new TextEncoder().encode(s+'\n')),1500,'El USB no responde a tiempo')}
 async function requestProfile(){
@@ -50,11 +62,13 @@ function driverHint(info){let id=info.usbVendorId;if(id===0x303a)return 'USB nat
 async function openConfiguredPort(candidate){
   port=candidate;
   await port.open({baudRate:115200});
-  // Web Serial leaves modem-control signals unspecified.  Native ESP USB
-  // CDC/JTAG interfaces can report an open endpoint before the host has
-  // asserted DTR, so explicitly assert it before asking the firmware for its
-  // profile.  UART bridges ignore this harmlessly; it does not reset the ESP.
-  try{await port.setSignals({dataTerminalReady:true,requestToSend:true})}catch{}
+  // Do not touch DTR/RTS on Espressif's native USB JTAG/serial endpoint.
+  // Those control lines are the bootloader/reset transport on S3/C3/C6 and
+  // asserting them from the configurator can leave some S3 SuperMini boards
+  // waiting for a physical RESET. UART bridges still need their normal idle
+  // levels, so keep that behavior only for non-native USB ports.
+  const info=port.getInfo(),nativeEspressif=info.usbVendorId===0x303a&&info.usbProductId===0x1001;
+  if(!nativeEspressif)try{await port.setSignals({dataTerminalReady:true,requestToSend:true})}catch{}
   writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar';read()
 }
 async function reconnectNativeUsb(){

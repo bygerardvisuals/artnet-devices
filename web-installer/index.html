@@ -31,7 +31,7 @@
     <p><b>CH340, CH341 o CH9102:</b> instala el controlador <a href="https://www.wch.cn/downloads/CH341SER_ZIP.html">WCH</a>. <b>CP210x:</b> instala el <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers">VCP de Silicon Labs</a>. Son habituales en ESP32 clásicos y ESP8266/Wemos; confirma el chip impreso en tu placa o el nombre del puerto.</p>
     <p><small>En Windows, macOS Intel, macOS Apple Silicon y Linux la web funciona con Chrome/Edge mediante Web Serial. La app de escritorio usa el puerto serie del sistema y no depende de Chrome.</small></p>
   </div>
-  <p><a href="usb-configure.html?v=2.2.0-auto-open"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
+  <p><a href="usb-configure.html?v=2.4.3-safe-reader"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
   <p><small>Incluye búsqueda de redes, IP, universo, GPIO/canales y PWM sin desconectar el ordenador de Internet. El botón <i>Change Wi‑Fi</i> del cuadro de Espressif sólo admite SSID manual: usa este configurador para escanear.</small></p>
   <p><small>El portal de red permanece siempre disponible: únete al Wi‑Fi <code>ArtNet-Devices-Setup</code> y abre <code>http://192.168.4.1</code>, incluso después de guardar otra red. Si el dispositivo está en tu Wi‑Fi habitual, también puedes usar su IP o su nombre <code>artnet-devices.local</code>. El portal cautivo se abrirá automáticamente en los sistemas compatibles.</small></p>
   <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>
@@ -45,9 +45,10 @@ const profiles = [
   { match: /ESP32-C2/i, file: 'artnet-devices-esp32c2.bin', label: 'ESP32-C2 DevKitM-1' },
   { match: /ESP32-S2/i, file: 'artnet-devices-esp32s2.bin', label: 'ESP32-S2 Saola-1' },
   // S3 SuperMini exposes its COM connector as native USB Serial/JTAG, just
-  // like the C3/C6.  Do not toggle the legacy UART reset lines after writing
-  // it: that can leave this family in the ROM downloader instead of the app.
-  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 SuperMini', nativeUsb: true },
+  // like the C3/C6.  It needs a *full* watchdog reset after flashing: the
+  // USB-JTAG RTS reset only resets the CPU and does not re-sample GPIO0,
+  // which can otherwise leave it in the ROM downloader.
+  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3', nativeUsb: true, watchdogReset: true },
   // ESP8266 images produced by Arduino already contain the boot header.  A
   // Wemos/NodeMCU factory image targets 4 MB; forcing this prevents the
   // incomplete JEDEC reply seen on common CH340/CP210x modules.  Unlike the
@@ -81,9 +82,30 @@ $('install').onclick = async () => {
     status('Selecciona el puerto USB de la placa…');
     const port = await navigator.serial.requestPort();
     transport = new Transport(port);
-    const loader = new ESPLoader({ transport, baudrate: 115200, terminal });
+    const usb = port.getInfo();
+    // Web Serial exposes VID/PID on the Port but esptool-js 0.7 does not
+    // always propagate it to Transport on macOS.  In that case it chooses a
+    // UART DTR/RTS reset and cannot enter the USB Serial/JTAG bootloader.
+    // Force Espressif's documented USB reset only for its native 303A:1001
+    // endpoint; USB-UART boards keep the ordinary automatic reset path.
+    const before = usb.usbVendorId === 0x303a && usb.usbProductId === 0x1001 ? 'usb_reset' : 'default_reset';
     status('Identificando el chip…');
-    const chip = String(await loader.main());
+    let loader = new ESPLoader({ transport, baudrate: 115200, terminal });
+    let chip;
+    try {
+      chip = String(await loader.main(before));
+    } catch (firstError) {
+      // USB Serial/JTAG boards may already be in download mode because the
+      // user pressed BOOT. Sending another USB reset can discard that state
+      // on some S3 SuperMini revisions. The documented no-reset mode talks
+      // to the bootloader exactly as it is, without a second control pulse.
+      if (before !== 'usb_reset') throw firstError;
+      terminal.writeLine('El reset USB no respondió; probando el bootloader ya activo sin reiniciarlo…');
+      await release(transport);
+      transport = new Transport(port);
+      loader = new ESPLoader({ transport, baudrate: 115200, terminal });
+      chip = String(await loader.main('no_reset'));
+    }
     const profile = profiles.find((item) => item.match.test(chip));
     if (!profile) throw new Error(`Chip no compatible detectado: ${chip}`);
     status(`Detectado ${profile.label}. Descargando firmware…`);
@@ -112,12 +134,34 @@ $('install').onclick = async () => {
     // This is also necessary on native-USB S3 boards: the configurator must
     // never attach to the downloader endpoint and wait for a manual reset.
     try {
+      // On ESP32-S3 USB Serial/JTAG, RTS only resets the CPU and retains the
+      // ROM's forced-download flag. The current Espressif esptool S3 target
+      // first clears RTC_CNTL_FORCE_DOWNLOAD_BOOT (RTC_CNTL_OPTION1 bit 0),
+      // then uses a watchdog reset so the strap state is sampled again. This
+      // is essential on S3 SuperMini boards: without the clear, a successful
+      // flash returns straight to the downloader and USB configuration waits
+      // for a physical RESET.
+      if (profile.watchdogReset) {
+        // esptool-js 0.7 predates ESP32-S3's watchdogReset() implementation.
+        // Port Espressif esptool's documented S3 sequence verbatim instead of
+        // silently falling back to a UART control-line reset:
+        // https://github.com/espressif/esptool/blob/master/esptool/targets/esp32s3.py
+        // First clear FORCE_DOWNLOAD_BOOT, then arm the RTC watchdog for a
+        // full reset.  This gets native USB Serial/JTAG back to the flashed
+        // application without the user pressing RESET.
+        terminal.writeLine('S3: saliendo del modo descarga y reiniciando…');
+        await loader.writeReg(0x6000812c, 0, 0x1);
+        await loader.writeReg(0x600080b0, 0x50d83aa1);
+        await loader.writeReg(0x6000809c, 2000);
+        await loader.writeReg(0x60008098, 0xd0000102);
+        await loader.writeReg(0x600080b0, 0);
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
       // `hard_reset` only lowers RTS and does not reset the USB Serial/JTAG
-      // peripheral on C3/C6/S3. Use Espressif's native JTAG reset sequence
-      // while the flashing transport still owns the port, then hand the same
-      // endpoint to the automatic configurator. This avoids any BOOT/RST
-      // action by the user and does not touch Chrome from a live reader.
-      if (profile.nativeUsb) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
+      // peripheral on C3/C6. Use Espressif's native JTAG reset sequence while
+      // the flashing transport still owns the port, then hand the same endpoint
+      // to the automatic configurator without BOOT/RST action by the user.
+      else if (profile.nativeUsb) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
       // On an ESP8266 the generic esptool-js hard reset only deasserts RTS.
       // CP2102/CH340 NodeMCU reset wiring needs EN pulsed while GPIO0 stays
       // high; otherwise Chrome reconnects to the flashing stub, not the app.
@@ -134,7 +178,11 @@ $('install').onclick = async () => {
     // Native USB may re-enumerate for a moment.  The destination retries the
     // remembered port until the running firmware replies, without a button,
     // BOOT or RST action from the user.
-    setTimeout(() => { location.href = 'usb-configure.html?v=2.3.1-safe-port-handoff'; }, profile.nativeUsb ? 1100 : 500);
+    // New cache key is intentional: a previous USB configurator asserted
+    // modem-control lines when it opened an S3 native endpoint. That is safe
+    // for UART bridges but can hold an S3 SuperMini outside its app. Always
+    // hand off to the native-USB-safe revision after flashing.
+    setTimeout(() => { location.href = 'usb-configure.html?v=2.4.3-safe-reader'; }, profile.nativeUsb ? 1400 : 500);
   } catch (error) {
     status(friendlyError(error), true);
     terminal.writeLine(`\nERROR: ${String(error?.stack || error)}`);
