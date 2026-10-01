@@ -44,7 +44,10 @@ const profiles = [
   { match: /ESP32-C3/i, file: 'artnet-devices-esp32c3-supermini.bin', label: 'ESP32-C3 SuperMini', nativeUsb: true },
   { match: /ESP32-C2/i, file: 'artnet-devices-esp32c2.bin', label: 'ESP32-C2 DevKitM-1' },
   { match: /ESP32-S2/i, file: 'artnet-devices-esp32s2.bin', label: 'ESP32-S2 Saola-1' },
-  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 DevKitC-1' },
+  // S3 SuperMini exposes its COM connector as native USB Serial/JTAG, just
+  // like the C3/C6.  Do not toggle the legacy UART reset lines after writing
+  // it: that can leave this family in the ROM downloader instead of the app.
+  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3 SuperMini', nativeUsb: true },
   { match: /ESP8266/i, file: 'artnet-devices-wemos-d1-mini.bin', label: 'ESP8266 / Wemos D1 mini / NodeMCU', flashSize: '4MB' },
   // `loader.main()` reports detailed names such as ESP32-D0WD-V3, not just
   // "ESP32".  Keep this last so the C2/C3/C6/S2/S3 profiles win first.
@@ -105,9 +108,20 @@ $('install').onclick = async () => {
       status(`Firmware grabado en ${profile.label}. Abriendo Configurar por USB…`);
     }
     await release(transport); transport = undefined;
-    // The browser retains permission for the selected port, so the
-    // configurator can reconnect without another chooser or a Wi-Fi change.
-    setTimeout(() => { location.href = 'usb-configure.html?v=2.2.0-auto-open'; }, 350);
+    // Native USB boards deliberately require a clean, user-visible reboot
+    // after esptool releases the downloader. This avoids a race where Chrome
+    // opens the configurator while the S3 is still exposing its ROM endpoint.
+    if (profile.nativeUsb) {
+      status(`Firmware grabado en ${profile.label}. Pulsa RST una vez, sin BOOT, y después abre el configurador USB.`);
+      const open = document.createElement('button');
+      open.type = 'button'; open.className = 'primary'; open.textContent = 'Abrir configurador USB';
+      open.onclick = () => { location.href = 'usb-configure.html?v=2.2.1-native-usb'; };
+      $('installStatus').append(document.createElement('br'), open);
+    } else {
+      // The browser retains permission for the selected port, so the
+      // configurator can reconnect without another chooser or a Wi-Fi change.
+      setTimeout(() => { location.href = 'usb-configure.html?v=2.2.1-native-usb'; }, 350);
+    }
   } catch (error) {
     status(friendlyError(error), true);
     terminal.writeLine(`\nERROR: ${String(error?.stack || error)}`);
