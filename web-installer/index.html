@@ -31,7 +31,7 @@
     <p><b>CH340, CH341 o CH9102:</b> instala el controlador <a href="https://www.wch.cn/downloads/CH341SER_ZIP.html">WCH</a>. <b>CP210x:</b> instala el <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers">VCP de Silicon Labs</a>. Son habituales en ESP32 clásicos y ESP8266/Wemos; confirma el chip impreso en tu placa o el nombre del puerto.</p>
     <p><small>En Windows, macOS Intel, macOS Apple Silicon y Linux la web funciona con Chrome/Edge mediante Web Serial. La app de escritorio usa el puerto serie del sistema y no depende de Chrome.</small></p>
   </div>
-  <p><a href="usb-configure.html?v=2.4.3-safe-reader"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
+  <p><a href="usb-configure.html?v=2.4.4-uart-s3"><b>Configurador único recomendado: USB en Chrome →</b></a></p>
   <p><small>Incluye búsqueda de redes, IP, universo, GPIO/canales y PWM sin desconectar el ordenador de Internet. El botón <i>Change Wi‑Fi</i> del cuadro de Espressif sólo admite SSID manual: usa este configurador para escanear.</small></p>
   <p><small>El portal de red permanece siempre disponible: únete al Wi‑Fi <code>ArtNet-Devices-Setup</code> y abre <code>http://192.168.4.1</code>, incluso después de guardar otra red. Si el dispositivo está en tu Wi‑Fi habitual, también puedes usar su IP o su nombre <code>artnet-devices.local</code>. El portal cautivo se abrirá automáticamente en los sistemas compatibles.</small></p>
   <small>Detecta la familia de chip y ofrece firmware para ESP32‑C6, C3, C2, ESP32, S2, S3 y ESP8266. El firmware conoce el perfil instalado y sólo permite GPIO seguros.</small>
@@ -88,7 +88,8 @@ $('install').onclick = async () => {
     // UART DTR/RTS reset and cannot enter the USB Serial/JTAG bootloader.
     // Force Espressif's documented USB reset only for its native 303A:1001
     // endpoint; USB-UART boards keep the ordinary automatic reset path.
-    const before = usb.usbVendorId === 0x303a && usb.usbProductId === 0x1001 ? 'usb_reset' : 'default_reset';
+    const nativeEspressifPort = usb.usbVendorId === 0x303a && usb.usbProductId === 0x1001;
+    const before = nativeEspressifPort ? 'usb_reset' : 'default_reset';
     status('Identificando el chip…');
     let loader = new ESPLoader({ transport, baudrate: 115200, terminal });
     let chip;
@@ -141,7 +142,7 @@ $('install').onclick = async () => {
       // is essential on S3 SuperMini boards: without the clear, a successful
       // flash returns straight to the downloader and USB configuration waits
       // for a physical RESET.
-      if (profile.watchdogReset) {
+      if (profile.watchdogReset && nativeEspressifPort) {
         // esptool-js 0.7 predates ESP32-S3's watchdogReset() implementation.
         // Port Espressif esptool's documented S3 sequence verbatim instead of
         // silently falling back to a UART control-line reset:
@@ -161,7 +162,7 @@ $('install').onclick = async () => {
       // peripheral on C3/C6. Use Espressif's native JTAG reset sequence while
       // the flashing transport still owns the port, then hand the same endpoint
       // to the automatic configurator without BOOT/RST action by the user.
-      else if (profile.nativeUsb) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
+      else if (profile.nativeUsb && nativeEspressifPort) await loader.after('custom_reset', undefined, 'R0|D0|W100|D1|R0|W100|R1|D0|R1|W100|R0|D0');
       // On an ESP8266 the generic esptool-js hard reset only deasserts RTS.
       // CP2102/CH340 NodeMCU reset wiring needs EN pulsed while GPIO0 stays
       // high; otherwise Chrome reconnects to the flashing stub, not the app.
@@ -182,7 +183,7 @@ $('install').onclick = async () => {
     // modem-control lines when it opened an S3 native endpoint. That is safe
     // for UART bridges but can hold an S3 SuperMini outside its app. Always
     // hand off to the native-USB-safe revision after flashing.
-    setTimeout(() => { location.href = 'usb-configure.html?v=2.4.3-safe-reader'; }, profile.nativeUsb ? 1400 : 500);
+    setTimeout(() => { location.href = 'usb-configure.html?v=2.4.4-uart-s3'; }, nativeEspressifPort ? 1400 : 500);
   } catch (error) {
     status(friendlyError(error), true);
     terminal.writeLine(`\nERROR: ${String(error?.stack || error)}`);

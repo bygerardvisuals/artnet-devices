@@ -62,13 +62,10 @@ function driverHint(info){let id=info.usbVendorId;if(id===0x303a)return 'USB nat
 async function openConfiguredPort(candidate){
   port=candidate;
   await port.open({baudRate:115200});
-  // Do not touch DTR/RTS on Espressif's native USB JTAG/serial endpoint.
-  // Those control lines are the bootloader/reset transport on S3/C3/C6 and
-  // asserting them from the configurator can leave some S3 SuperMini boards
-  // waiting for a physical RESET. UART bridges still need their normal idle
-  // levels, so keep that behavior only for non-native USB ports.
-  const info=port.getInfo(),nativeEspressif=info.usbVendorId===0x303a&&info.usbProductId===0x1001;
-  if(!nativeEspressif)try{await port.setSignals({dataTerminalReady:true,requestToSend:true})}catch{}
+  // Reading configuration never needs DTR/RTS.  Changing either line here
+  // can reset a board through the automatic-programming circuit on CH340 /
+  // CP210x modules, or disturb native USB Serial/JTAG on C3/C6/S3.  Leave
+  // both exactly as the operating system opened them.
   writer=port.writable.getWriter();connected=true;$('connect').textContent='Desconectar';read()
 }
 async function reconnectNativeUsb(){
