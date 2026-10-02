@@ -48,7 +48,7 @@ const profiles = [
   // like the C3/C6.  It needs a *full* watchdog reset after flashing: the
   // USB-JTAG RTS reset only resets the CPU and does not re-sample GPIO0,
   // which can otherwise leave it in the ROM downloader.
-  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', label: 'ESP32-S3', nativeUsb: true, watchdogReset: true },
+  { match: /ESP32-S3/i, file: 'artnet-devices-esp32s3.bin', uartFile: 'artnet-devices-esp32s3-uart.bin', label: 'ESP32-S3', nativeUsb: true, watchdogReset: true },
   // ESP8266 images produced by Arduino already contain the boot header.  A
   // Wemos/NodeMCU factory image targets 4 MB; forcing this prevents the
   // incomplete JEDEC reply seen on common CH340/CP210x modules.  Unlike the
@@ -109,8 +109,10 @@ $('install').onclick = async () => {
     }
     const profile = profiles.find((item) => item.match.test(chip));
     if (!profile) throw new Error(`Chip no compatible detectado: ${chip}`);
-    status(`Detectado ${profile.label}. Descargando firmware…`);
-    const response = await fetch(`firmware/${profile.file}?v=2.1.3-direct-flash`, { cache: 'no-store' });
+    const firmwareFile = !nativeEspressifPort && profile.uartFile ? profile.uartFile : profile.file;
+    const connectionLabel = !nativeEspressifPort && profile.uartFile ? 'USB‑serie UART' : 'USB nativo';
+    status(`Detectado ${profile.label} (${connectionLabel}). Descargando firmware…`);
+    const response = await fetch(`firmware/${firmwareFile}?v=2.4.5-s3-uart`, { cache: 'no-store' });
     if (!response.ok) throw new Error('No se ha podido descargar el firmware correcto.');
     const firmware = new Uint8Array(await response.arrayBuffer());
     // Some C3/C6 SuperMini clones expose a native USB-JTAG endpoint that
